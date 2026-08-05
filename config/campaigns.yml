@@ -1,0 +1,27 @@
+campaigns:
+
+  tipmip-cnrm:
+    project: CMIP6Plus
+    activity: TIPMIP
+    institution: CNRM-CERFACS
+
+    mapfile_root: /modfs/esgf/topublish/CNRM-CERFACS/.mapfiles
+    archive_root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/CNRM-CERFACS
+
+
+  tipmip-ubern:
+    project: CMIP6Plus
+    activity: TIPMIP
+    institution: UBERN
+
+    mapfile_root: /modfs/esgf/topublish/UBERN/.mapfiles
+    archive_root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/UBERN
+
+
+  tipmip-uib:
+    project: CMIP6Plus
+    activity: TIPMIP
+    institution: UiB
+
+    mapfile_root: /modfs/esgf/topublish/UiB/.mapfiles
+    archive_root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/UiB

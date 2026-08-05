@@ -1,0 +1,15 @@
+cat > .gitignore <<'EOF'
+# Python
+__pycache__/
+*.pyc
+
+# Database
+*.duckdb
+*.duckdb.wal
+
+# Logs
+logs/
+
+# Temporary files
+*.tmp
+EOF
