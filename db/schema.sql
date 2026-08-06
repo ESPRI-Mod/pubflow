@@ -1,58 +1,164 @@
-CREATE TABLE IF NOT EXISTS campaigns (
-    name VARCHAR PRIMARY KEY,
-    project VARCHAR,
-    activity VARCHAR,
-    institution VARCHAR,
-    mapfile_root VARCHAR,
-    archive_root VARCHAR
+CREATE TABLE IF NOT EXISTS campaigns
+(
+    name
+    VARCHAR
+    PRIMARY
+    KEY,
+
+    project
+    VARCHAR
+    NOT
+    NULL,
+    activity
+    VARCHAR
+    NOT
+    NULL,
+    institution
+    VARCHAR
+    NOT
+    NULL,
+
+    mapfile_root
+    VARCHAR
+    NOT
+    NULL,
+
+    archive_root
+    VARCHAR
 );
 
 
-CREATE TABLE IF NOT EXISTS datasets (
-    dataset_id VARCHAR PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS datasets
+(
 
-    campaign VARCHAR,
+    dataset_id
+    VARCHAR
+    PRIMARY
+    KEY,
 
-    project VARCHAR,
-    activity VARCHAR,
-    institution VARCHAR,
+    campaign
+    VARCHAR
+    NOT
+    NULL,
 
-    drs JSON,
+    project
+    VARCHAR
+    NOT
+    NULL,
+    activity
+    VARCHAR
+    NOT
+    NULL,
+    institution
+    VARCHAR
+    NOT
+    NULL,
 
-    mapfile VARCHAR,
+    drs
+    JSON,
 
-    publication_status VARCHAR DEFAULT 'PENDING',
-    archive_status VARCHAR DEFAULT 'PENDING',
+    mapfile
+    VARCHAR
+    NOT
+    NULL,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    publication_status
+    VARCHAR
+    NOT
+    NULL
+    DEFAULT
+    'PENDING',
+
+    archive_status
+    VARCHAR
+    NOT
+    NULL
+    DEFAULT
+    'PENDING',
+
+    registered_at
+    TIMESTAMP
+    DEFAULT
+    CURRENT_TIMESTAMP,
+
+    FOREIGN
+    KEY
+(
+    campaign
+)
+    REFERENCES campaigns
+(
+    name
+)
+    );
 
 
-CREATE TABLE IF NOT EXISTS files (
-    dataset_id VARCHAR,
-    file_path VARCHAR,
+CREATE TABLE IF NOT EXISTS files
+(
 
-    file_size BIGINT,
+    dataset_id
+    VARCHAR,
 
-    checksum VARCHAR,
-    mod_time VARCHAR,
+    file_path
+    VARCHAR,
 
-    PRIMARY KEY(dataset_id, file_path),
+    file_size
+    BIGINT,
 
-    FOREIGN KEY(dataset_id)
-        REFERENCES datasets(dataset_id)
-);
+    checksum
+    VARCHAR,
+
+    mod_time
+    VARCHAR,
+
+    PRIMARY
+    KEY
+(
+    dataset_id,
+    file_path
+),
+    FOREIGN KEY
+(
+    dataset_id
+)
+    REFERENCES datasets
+(
+    dataset_id
+)
+    );
 
 
-CREATE TABLE IF NOT EXISTS publication_attempts (
-    dataset_id VARCHAR,
+CREATE TABLE IF NOT EXISTS publication_attempts
+(
 
-    started_at TIMESTAMP,
-    finished_at TIMESTAMP,
+    dataset_id
+    VARCHAR,
 
-    status VARCHAR,
-    exit_code INTEGER,
+    started_at
+    TIMESTAMP,
 
-    log_file VARCHAR,
-    error_message VARCHAR
-);
+    finished_at
+    TIMESTAMP,
+
+    status
+    VARCHAR,
+
+    exit_code
+    INTEGER,
+
+    log_file
+    VARCHAR,
+
+    error_message
+    VARCHAR,
+
+    FOREIGN
+    KEY
+(
+    dataset_id
+)
+    REFERENCES datasets
+(
+    dataset_id
+)
+    );
