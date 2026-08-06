@@ -8,10 +8,6 @@ campaigns:
 
     mapfile_root: /modfs/esgf/topublish/CNRM-CERFACS/.mapfiles
 
-    publisher:
-      executable: esgpublish
-      arguments: []
-
     archive:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/CNRM-CERFACS
@@ -25,9 +21,7 @@ campaigns:
 
     mapfile_root: /modfs/esgf/topublish/UBERN/.mapfiles
 
-    publisher:
-      executable: esgpublish
-      arguments: []
+
 
     archive:
       enabled: true
@@ -42,9 +36,6 @@ campaigns:
 
     mapfile_root: /modfs/esgf/topublish/UiB/.mapfiles
 
-    publisher:
-      executable: esgpublish
-      arguments: []
 
     archive:
       enabled: true

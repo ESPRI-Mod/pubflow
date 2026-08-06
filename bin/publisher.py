@@ -7,10 +7,70 @@ import typer
 from workflow.database import connect
 from workflow.campaign import get_campaign, load_campaigns
 from workflow.registry import register_dataset
+from workflow.reporting import (list_campaigns, campaign_summary,
+                                publication_summary, failed_publications)
+from workflow.executor import dry_run_campaign, publish_campaign
 
 app = typer.Typer(
     help="ESGF publication workflow manager"
 )
+
+
+@app.command()
+def campaigns_list():
+    """
+    List registered campaigns.
+    """
+
+    for row in list_campaigns():
+        typer.echo(
+            f"{row[0]} "
+            f"{row[1]} "
+            f"{row[2]} "
+            f"{row[3]}"
+        )
+
+        @app.command()
+        def status():
+
+            """
+            Show workflow status.
+            """
+
+            typer.echo("\nDatasets by campaign:\n")
+
+            for row in campaign_summary():
+                typer.echo(
+                    f"{row[0]:20} {row[1]}"
+                )
+
+            typer.echo("\nPublication status:\n")
+
+            for row in publication_summary():
+                typer.echo(
+                    f"{row[0]:20} {row[1]}"
+                )
+
+
+@app.command()
+def status():
+    """
+    Show workflow status.
+    """
+
+    typer.echo("\nDatasets by campaign:\n")
+
+    for row in campaign_summary():
+        typer.echo(
+            f"{row[0]:20} {row[1]}"
+        )
+
+    typer.echo("\nPublication status:\n")
+
+    for row in publication_summary():
+        typer.echo(
+            f"{row[0]:20} {row[1]}"
+        )
 
 
 @app.command()
@@ -106,36 +166,6 @@ def register(
 
 
 @app.command()
-def status():
-    """
-    Show registration/publication status summary.
-    """
-
-    conn = connect()
-
-    rows = conn.execute(
-        """
-        SELECT campaign,
-               publication_status,
-               COUNT(*)
-
-        FROM datasets
-
-        GROUP BY campaign,
-                 publication_status
-
-        ORDER BY campaign,
-                 publication_status
-        """
-    ).fetchall()
-
-    for row in rows:
-        typer.echo(row)
-
-    conn.close()
-
-
-@app.command()
 def campaigns(
         action: str
 ):
@@ -159,6 +189,27 @@ def campaigns(
 
 
 @app.command()
+def failures():
+    """
+    Show failed publications.
+    """
+
+    rows = failed_publications()
+
+    if not rows:
+        typer.echo(
+            "No failures"
+        )
+
+        return
+
+    for row in rows:
+        typer.echo(
+            f"{row[0]} {row[1]} {row[2]}"
+        )
+
+
+@app.command()
 def db_check():
     conn = connect()
 
@@ -172,6 +223,26 @@ def db_check():
         typer.echo(table)
 
     conn.close()
+
+
+@app.command()
+def publish(
+        campaign: str,
+        dry_run: bool = False,
+        limit: int = None,
+):
+    if dry_run:
+        dry_run_campaign(
+            campaign,
+            limit,
+        )
+
+        return
+
+    publish_campaign(
+        campaign,
+        limit,
+    )
 
 
 if __name__ == "__main__":

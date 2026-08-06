@@ -33,3 +33,23 @@ def get_pending_datasets(conn, campaign, limit=None):
         query,
         params
     ).fetchall()
+
+
+def update_dataset_status(
+        conn,
+        dataset_id,
+        status,
+):
+    conn.execute(
+        """
+        UPDATE datasets
+
+        SET publication_status = ?
+
+        WHERE dataset_id = ?
+        """,
+        [
+            status,
+            dataset_id,
+        ],
+    )
