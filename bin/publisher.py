@@ -10,10 +10,24 @@ from workflow.registry import register_dataset
 from workflow.reporting import (list_campaigns, campaign_summary,
                                 publication_summary, failed_publications)
 from workflow.executor import dry_run_campaign, publish_campaign
+from workflow.validator import validate_campaign
 
 app = typer.Typer(
     help="ESGF publication workflow manager"
 )
+
+
+@app.command()
+def validate(campaign: str,
+            limit: int | None = None):
+    try:
+        success = validate_campaign(campaign, limit)
+    except ValueError as exc:
+        typer.echo(f"ERROR: {exc}",
+        err=True)
+        raise typer.Exit(code=1)
+    if not success:
+        raise typer.Exit(code=1)
 
 
 @app.command()

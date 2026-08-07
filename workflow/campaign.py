@@ -71,14 +71,9 @@ def get_campaign(name):
         """,
         [name],
     ).fetchone()
-
     conn.close()
-
     if row is None:
-        raise ValueError(
-            f"Unknown campaign: {name}"
-        )
-
+        raise ValueError(f"Unknown campaign: {name}")
     return {
         "name": row[0],
         "project": row[1],
@@ -87,7 +82,6 @@ def get_campaign(name):
         "mapfile_root": row[4],
         "archive_root": row[5],
     }
-
 
 if __name__ == "__main__":
     load_campaigns()
