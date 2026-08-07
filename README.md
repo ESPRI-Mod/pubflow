@@ -1,5 +1,7 @@
-## Initialisation
+ython bin/init_db.py
 
+## Initialisation
+publisher 
 publisher campaigns load
 
 ## Registration

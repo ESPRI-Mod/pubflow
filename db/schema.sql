@@ -94,71 +94,26 @@ CREATE TABLE IF NOT EXISTS datasets
 
 
 CREATE TABLE IF NOT EXISTS files
-(
-
-    dataset_id
-    VARCHAR,
-
-    file_path
-    VARCHAR,
-
-    file_size
-    BIGINT,
-
-    checksum
-    VARCHAR,
-
-    mod_time
-    VARCHAR,
-
-    PRIMARY
-    KEY
-(
-    dataset_id,
-    file_path
-),
-    FOREIGN KEY
-(
-    dataset_id
-)
-    REFERENCES datasets
-(
-    dataset_id
-)
-    );
-
+(   dataset_id VARCHAR,
+    file_path VARCHAR,
+    file_size BIGINT,
+    checksum    VARCHAR,
+    mod_time    VARCHAR,
+    PRIMARY KEY (dataset_id,file_path),
+    FOREIGN KEY (dataset_id)
+    REFERENCES datasets(dataset_id)
+);
 
 CREATE TABLE IF NOT EXISTS publication_attempts
 (
-
-    dataset_id
-    VARCHAR,
-
-    started_at
-    TIMESTAMP,
-
-    finished_at
-    TIMESTAMP,
-
-    status
-    VARCHAR,
-
-    exit_code
-    INTEGER,
-
-    log_file
-    VARCHAR,
-
-    error_message
-    VARCHAR,
-
-    FOREIGN
-    KEY
-(
-    dataset_id
-)
-    REFERENCES datasets
-(
-    dataset_id
-)
-    );
+    dataset_id VARCHAR,
+    run_id VARCHAR,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    status VARCHAR,
+    exit_code INTEGER,
+    log_file VARCHAR,
+    error_message VARCHAR,
+    FOREIGN KEY(dataset_id)
+        REFERENCES datasets(dataset_id)
+);

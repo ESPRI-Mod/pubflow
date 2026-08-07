@@ -11,7 +11,7 @@ publisher:
     dry_run: false
 
   logging:
-    directory: logs
+    directory: /home/esguser/esgf-publisher-workflow/logs
 
   retry:
     enabled: true

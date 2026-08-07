@@ -12,21 +12,12 @@ CAMPAIGNS_FILE = (
 def load_campaigns():
     with open(CAMPAIGNS_FILE) as f:
         config = yaml.safe_load(f)
-
     conn = connect()
-
     for name, campaign in config["campaigns"].items():
-
-        archive = campaign.get(
-            "archive",
-            {}
-        )
-
+        archive = campaign.get("archive", {})
         archive_root = None
-
         if archive.get("enabled", False):
             archive_root = archive.get("root")
-
         conn.execute(
             """
             INSERT OR REPLACE INTO campaigns

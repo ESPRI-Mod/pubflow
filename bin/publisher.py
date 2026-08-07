@@ -74,32 +74,7 @@ def status():
 
 
 @app.command()
-def campaigns(
-        action: str
-):
-    """
-    Manage campaigns.
-    """
-
-    if action == "load":
-
-        load_campaigns()
-
-        typer.echo(
-            "Campaigns loaded"
-        )
-
-    else:
-
-        raise typer.BadParameter(
-            f"Unknown action: {action}"
-        )
-
-
-@app.command()
-def register(
-        campaign_name: str
-):
+def register(campaign_name: str):
     """
     Register all mapfiles belonging to a campaign.
     """
@@ -158,7 +133,6 @@ def register(
             failed += 1
 
     conn.close()
-
     typer.echo("")
     typer.echo(
         f"Completed: {success} succeeded, {failed} failed"
@@ -166,26 +140,15 @@ def register(
 
 
 @app.command()
-def campaigns(
-        action: str
-):
+def campaigns(action: str):
     """
     Manage campaigns.
     """
-
     if action == "load":
-
         load_campaigns()
-
-        typer.echo(
-            "Campaigns loaded"
-        )
-
+        typer.echo("Campaigns loaded")
     else:
-
-        raise typer.BadParameter(
-            f"Unknown action: {action}"
-        )
+        raise typer.BadParameter(f"Unknown action: {action}")
 
 
 @app.command()
@@ -229,12 +192,14 @@ def db_check():
 def publish(
         campaign: str,
         dry_run: bool = False,
-        limit: int = None,
+        limit: int | None = None,
+        batch_size: int = 50,
 ):
     if dry_run:
         dry_run_campaign(
             campaign,
             limit,
+            batch_size,
         )
 
         return
@@ -242,6 +207,7 @@ def publish(
     publish_campaign(
         campaign,
         limit,
+        batch_size
     )
 
 
