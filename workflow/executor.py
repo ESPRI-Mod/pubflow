@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from workflow.config import get_publisher_config
 from workflow.database import connect, update_dataset_status
+from workflow.result import PublicationResult
 
 
 def create_run_id(campaign):
@@ -218,82 +219,41 @@ def publish_dataset(
         dataset_id,
         run_id,
     )
-
     conn.commit()
-
-    command = build_publish_command(
-        mapfile
-    )
-
+    command = build_publish_command(mapfile)
     try:
-
-        with open(
-                log_file,
-                "a"
-        ) as log:
-
-            log.write(
-                "\n"
-                + "-" * 70
-                + "\n"
-            )
-
-            log.write(
-                f"Dataset: {dataset_id}\n"
-            )
-
-            log.write(
-                f"Mapfile: {mapfile}\n"
-            )
-
-            log.write(
-                f"Command: {' '.join(command)}\n"
-            )
-
-            log.write(
-                "-" * 70
-                + "\n"
-            )
-
+        with open(log_file,"a") as log:
+            log.write("\n" + "-" * 70 + "\n")
+            log.write(f"Dataset: {dataset_id}\n")
+            log.write(f"Mapfile: {mapfile}\n")
+            log.write(f"Command: {' '.join(command)}\n")
+            log.write("-" * 70 + "\n")
             result = subprocess.run(
                 command,
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 text=True,
             )
-
         if result.returncode == 0:
             status = "SUCCESS"
         else:
             status = "FAILED"
-
-        update_dataset_status(
-            conn,
-            dataset_id,
-            status,
-        )
-
-        finish_attempt(
-            conn,
-            dataset_id,
-            run_id,
-            status,
-            result.returncode,
-            str(log_file),
-        )
-
+        update_dataset_status(conn, dataset_id, status)
+        finish_attempt(conn, dataset_id, run_id, status,
+                       result.returncode, str(log_file))
         conn.commit()
-
-        return status
-
+        return PublicationResult(
+            dataset_id=dataset_id,
+            status=status,
+            exit_code=result.returncode,
+            log_file=str(log_file)
+        )
     except Exception as exc:
-
         update_dataset_status(
             conn,
             dataset_id,
             "FAILED",
         )
-
         finish_attempt(
             conn,
             dataset_id,
@@ -303,13 +263,15 @@ def publish_dataset(
             str(log_file),
             str(exc),
         )
-
         conn.commit()
-
-        return "FAILED"
-
+        return PublicationResult(
+            dataset_id=dataset_id,
+            status="FAILED",
+            exit_code=-1,
+            log_file=str(log_file),
+            error_message=str(exc),
+        )
     finally:
-
         conn.close()
 
 
@@ -362,11 +324,16 @@ def publish_campaign(
             result = publish_dataset(dataset_id, mapfile,
                                      run_id, log_file)
             processed_count += 1
-            if result == "SUCCESS":
+            if result.status == "SUCCESS":
+                print(f"SUCCESS {result.dataset_id}")
                 success_count += 1
-            elif result == "FAILED":
+            elif result.status == "FAILED":
+                print(f"FAILED {result.dataset_id}: "
+                    f"(exit code: {result.exit_code})")
+                if result.error_message:
+                    print(f"Error: {result.error_message}")
+                print(f"Log: {result.log_file}")
                 failed_count += 1
-            print(f"{dataset_id}: {result}")
             total_processed += 1
         print()
         print(f"Batch {batch_number} complete")
