@@ -11,7 +11,7 @@ campaigns:
     archive:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/CNRM-CERFACS
-
+      depth: experiment_id
 
   tipmip-ubern:
 
@@ -26,6 +26,7 @@ campaigns:
     archive:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/UBERN
+      depth: experiment_id
 
 
   tipmip-uib:
@@ -40,3 +41,4 @@ campaigns:
     archive:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/UiB
+      depth: experiment_id

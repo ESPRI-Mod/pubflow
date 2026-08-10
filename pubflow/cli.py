@@ -9,7 +9,7 @@ from workflow.validator import validate_campaign
 from workflow.exporter import export_campaign_status, sync_to_grist
 from workflow.grist import (check_connection, list_tables,
                             get_table_columns)
-
+from workflow.archive import generate_archive_tasks
 
 app = typer.Typer(
     help="ESGF publication workflow manager.",
@@ -102,6 +102,8 @@ def publish(
             err=True,
         )
         raise typer.Exit(code=1)
+
+
 @app.command()
 @app.command()
 def validate(
@@ -242,6 +244,36 @@ def grist_check():
             err=True,
         )
         raise typer.Exit(code=1)
+
+
+@app.command()
+def archive(
+        campaign_name: str,
+        limit: int = typer.Option(None),
+        output: str = typer.Option("archive_tasks.csv"),
+):
+    try:
+        count = generate_archive_tasks(
+            campaign_name,
+            output=output,
+            limit=limit,
+        )
+
+        typer.echo(
+            f"Generated {count} archive tasks"
+        )
+        typer.echo(
+            f"Output: {output}"
+        )
+
+    except Exception as exc:
+        typer.echo(
+            f"ERROR: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def version():
     """Show the pubflow version."""

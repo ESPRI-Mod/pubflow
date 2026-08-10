@@ -16,8 +16,10 @@ def load_campaigns():
     for name, campaign in config["campaigns"].items():
         archive = campaign.get("archive", {})
         archive_root = None
+        archive_depth = None
         if archive.get("enabled", False):
             archive_root = archive.get("root")
+            archive_depth = archive.get("depth")
         conn.execute(
             """
             INSERT OR REPLACE INTO campaigns
@@ -27,10 +29,11 @@ def load_campaigns():
                 activity,
                 institution,
                 mapfile_root,
-                archive_root
+                archive_root,
+                archive_depth
             )
 
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 name,
@@ -39,6 +42,7 @@ def load_campaigns():
                 campaign["institution"],
                 campaign["mapfile_root"],
                 archive_root,
+                archive_depth
             ],
         )
 
@@ -63,7 +67,8 @@ def get_campaign(name):
                activity,
                institution,
                mapfile_root,
-               archive_root
+               archive_root,
+               archive_depth
 
         FROM campaigns
 
@@ -81,6 +86,7 @@ def get_campaign(name):
         "institution": row[3],
         "mapfile_root": row[4],
         "archive_root": row[5],
+        "archive_depth": row[6],
     }
 
 if __name__ == "__main__":

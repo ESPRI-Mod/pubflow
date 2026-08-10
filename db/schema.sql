@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS campaigns
     NULL,
 
     archive_root
+    VARCHAR,
+
+    archive_depth
     VARCHAR
 );
 
