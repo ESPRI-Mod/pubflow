@@ -11,6 +11,10 @@ from workflow.reporting import (list_campaigns, campaign_summary,
                                 publication_summary, failed_publications)
 from workflow.executor import dry_run_campaign, publish_campaign
 from workflow.validator import validate_campaign
+from workflow.exporter import (export_campaign_status,
+                               export_campaign_summary, export_failures,
+                               sync_to_grist)
+from workflow.grist import check_connection, list_tables, get_table_columns
 
 app = typer.Typer(
     help="ESGF publication workflow manager"
@@ -19,12 +23,12 @@ app = typer.Typer(
 
 @app.command()
 def validate(campaign: str,
-            limit: int | None = None):
+             limit: int | None = None):
     try:
         success = validate_campaign(campaign, limit)
     except ValueError as exc:
         typer.echo(f"ERROR: {exc}",
-        err=True)
+                   err=True)
         raise typer.Exit(code=1)
     if not success:
         raise typer.Exit(code=1)
@@ -224,6 +228,91 @@ def publish(
         batch_size
     )
 
+
+@app.command()
+def export(output: str = "campaign_status.csv",
+           export_type: str = typer.Option(
+               "datasets",
+               "--type"
+           ),
+           campaign: str | None = typer.Option(None, "--campaign")):
+    if export_type == "datasets":
+        export_campaign_status(output)
+    elif export_type == "campaigns":
+        export_campaign_summary(output)
+    elif export_type == "failures":
+        export_failures(output, campaign)
+    else:
+        typer.echo(f"ERROR: Unknonw export type {export_type}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(
+        f"Exported {export_type} to {output}"
+    )
+
+
+@app.command()
+def grist_check():
+    try:
+        check_connection()
+        typer.echo("Grist connection successful")
+    except Exception as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def grist_tables():
+    try:
+        result = list_tables()
+
+        for table in result.get("tables", []):
+            typer.echo(
+                table["id"]
+            )
+
+    except Exception as exc:
+        typer.echo(
+            f"ERROR: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def grist_columns(table_id: str):
+    try:
+        result = get_table_columns(table_id)
+        typer.echo(repr(result))
+    except Exception as exc:
+        typer.echo(
+            f"ERROR: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def grist_sync():
+    try:
+        result = sync_to_grist()
+        typer.echo(
+            "Grist synchronisation complete"
+        )
+        typer.echo(
+            f"Campaigns: {result['campaigns']}"
+        )
+        typer.echo(
+            f"Datasets:  {result['datasets']}"
+        )
+        typer.echo(
+            f"Failures:  {result['failures']}"
+        )
+    except Exception as exc:
+        typer.echo(
+            f"ERROR: {exc}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
 if __name__ == "__main__":
     app()

@@ -5,7 +5,7 @@ from datetime import datetime
 from workflow.config import get_publisher_config
 from workflow.database import connect, update_dataset_status
 from workflow.result import PublicationResult
-
+from workflow.summary import PublicationSummary
 
 def create_run_id(campaign):
     timestamp = datetime.today().strftime("%Y%m%d%H%M%S")
@@ -281,6 +281,7 @@ def publish_campaign(
         batch_size=50,
 ):
     run_id = create_run_id(campaign)
+    summary = PublicationSummary(campaign=campaign, run_id=run_id)
     log_file = get_run_log_file(campaign, run_id)
     success_count = 0
     failed_count = 0
@@ -323,6 +324,7 @@ def publish_campaign(
         for dataset_id, mapfile, status in datasets:
             result = publish_dataset(dataset_id, mapfile,
                                      run_id, log_file)
+            summary.add_result(result)
             processed_count += 1
             if result.status == "SUCCESS":
                 print(f"SUCCESS {result.dataset_id}")
@@ -337,6 +339,34 @@ def publish_campaign(
             total_processed += 1
         print()
         print(f"Batch {batch_number} complete")
+        print()
+        print("=" * 60)
+        print("Publication run complete")
+        print("=" * 60)
+        print(
+            f"Campaign: {summary.campaign}"
+        )
+        print(
+            f"Run ID: {summary.run_id}"
+        )
+        print()
+        print(
+            f"Total:   {summary.total}"
+        )
+        print(
+            f"Success: {summary.success}"
+        )
+        print(
+            f"Failed:  {summary.failed}"
+        )
+        if summary.failures:
+            print()
+            print("Failed datasets:")
+            for failure in summary.failures:
+                print(
+                    f"  - {failure.dataset_id} "
+                    f"(exit code {failure.exit_code})"
+                )
     print()
     print(
         f"Total datasets processed: "
