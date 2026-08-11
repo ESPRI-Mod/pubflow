@@ -9,7 +9,7 @@ from workflow.validator import validate_campaign
 from workflow.exporter import export_campaign_status, sync_to_grist
 from workflow.grist import (check_connection, list_tables,
                             get_table_columns)
-from workflow.archive import generate_archive_tasks
+from workflow.archive import (generate_archive_tasks, import_archive_results)
 
 app = typer.Typer(
     help="ESGF publication workflow manager.",
@@ -271,6 +271,23 @@ def archive(
             f"ERROR: {exc}",
             err=True,
         )
+        raise typer.Exit(code=1)
+
+
+@app.command("archive-import")
+def archive_import(results_file: str):
+    try:
+        result = import_archive_results(results_file)
+
+        typer.echo(f"Success:          {result['SUCCESS']}")
+        typer.echo(f"Already exists:   {result['ALREADY_EXISTS']}")
+        typer.echo(f"Conflicts:        {result['CONFLICT']}")
+        typer.echo(f"Failed:           {result['FAILED']}")
+        typer.echo(f"Unknown datasets: {result['UNKNOWN_DATASET']}")
+        typer.echo(f"Unknown statuses: {result['UNKNOWN']}")
+
+    except Exception as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
         raise typer.Exit(code=1)
 
 

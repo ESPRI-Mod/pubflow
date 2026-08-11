@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import csv
 from pathlib import Path
 
@@ -8,78 +9,45 @@ from workflow.database import connect
 from workflow.registry import parse_drs
 
 
-def get_archivable_datasets(
-        campaign,
-        limit=None,
-):
+def get_archivable_datasets(campaign, limit=None):
     conn = connect()
 
     query = """
-            SELECT dataset_id,
-                   mapfile,
-                   archive_status
+            SELECT dataset_id, mapfile, archive_status
             FROM datasets
             WHERE campaign = ?
               AND publication_status = 'SUCCESS'
               AND archive_status = 'PENDING'
             ORDER BY dataset_id \
             """
-
     params = [campaign]
 
     if limit is not None:
         query += " LIMIT ?"
         params.append(limit)
 
-    rows = conn.execute(
-        query,
-        params,
-    ).fetchall()
-
+    rows = conn.execute(query, params).fetchall()
     conn.close()
-
     return rows
 
 
-def get_archive_path(
-        dataset_id,
-        mapfile,
-        campaign,
-):
+def get_archive_path(dataset_id, mapfile, campaign):
     """
-    Build the destination path for a dataset's mapfile.
-
-    The campaign archive_root already represents the fixed
-    project/activity/institution part of the DRS.
-
-    The remaining DRS hierarchy is generated from the
-    ESGVOC directory specification until archive_depth.
+    Build the archive destination from the campaign archive root
+    and the configured ESGVOC DRS depth.
     """
-
     mapping = parse_drs(dataset_id)
-
-    generator = DrsGenerator(
-        mapping["mip_era"].lower()
-    )
-
+    generator = DrsGenerator(mapping["mip_era"].lower())
     parts = generator.directory_specs.parts
 
-    archive_root = Path(
-        campaign["archive_root"]
-    )
-
+    archive_root = Path(campaign["archive_root"])
     depth = campaign["archive_depth"]
 
-    # The archive root corresponds to the first three
-    # DRS components: project/activity/institution.
     root_components = [
         mapping["mip_era"],
         mapping["activity_id"],
         mapping["institution_id"],
     ]
-
-    # Validate that the campaign configuration matches
-    # the dataset's DRS prefix.
     expected_root = [
         campaign["project"],
         campaign["activity"],
@@ -88,100 +56,182 @@ def get_archive_path(
 
     if root_components != expected_root:
         raise ValueError(
-            f"Dataset {dataset_id} does not match campaign "
-            f"DRS prefix: expected {expected_root}, "
-            f"got {root_components}"
+            f"Dataset {dataset_id} does not match campaign DRS prefix: "
+            f"expected {expected_root}, got {root_components}"
         )
 
     selected = []
 
-    root_length = len(root_components)
-
-    for part in parts[root_length:]:
+    for part in parts[len(root_components):]:
         name = part.source_collection
 
         if name not in mapping:
             raise ValueError(
-                f"DRS component '{name}' is missing from "
-                f"dataset mapping for {dataset_id}"
+                f"DRS component '{name}' is missing from dataset mapping "
+                f"for {dataset_id}"
             )
 
-        selected.append(
-            mapping[name]
-        )
+        selected.append(mapping[name])
 
         if name == depth:
             break
-
     else:
         raise ValueError(
-            f"Archive depth '{depth}' was not found in the "
-            f"ESGVOC DRS specification for {dataset_id}"
+            f"Archive depth '{depth}' was not found in the ESGVOC "
+            f"DRS specification for {dataset_id}"
         )
 
-    return (
-            archive_root
-            / Path(*selected)
-            / ".mapfiles"
-            / Path(mapfile).name
-    )
+    return archive_root / Path(*selected) / ".mapfiles" / Path(mapfile).name
 
 
-def generate_archive_tasks(
-        campaign_name,
-        output,
-        limit=None,
-):
-    campaign = get_campaign(
-        campaign_name
-    )
+def generate_archive_tasks(campaign_name, output, limit=None):
+    campaign = get_campaign(campaign_name)
+    rows = get_archivable_datasets(campaign_name, limit)
 
-    rows = get_archivable_datasets(
-        campaign_name,
-        limit,
-    )
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
 
-    output = Path(
-        output
-    )
-
-    output.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    count = 0
-
-    with open(
-            output,
-            "w",
-            newline="",
-    ) as f:
+    with open(output, "w", newline="") as f:
         writer = csv.writer(f)
+        writer.writerow(["dataset_id", "mapfile", "archive_path"])
 
-        writer.writerow(
-            [
+        for dataset_id, mapfile, _ in rows:
+            writer.writerow([
+                dataset_id,
+                mapfile,
+                str(get_archive_path(dataset_id, mapfile, campaign)),
+            ])
+
+    return len(rows)
+
+
+def import_archive_results(results_file):
+    results_file = Path(results_file)
+
+    if not results_file.exists():
+        raise FileNotFoundError(
+            f"Results file does not exist: {results_file}"
+        )
+
+    counts = {
+        "SUCCESS": 0,
+        "ALREADY_EXISTS": 0,
+        "CONFLICT": 0,
+        "FAILED": 0,
+        "UNKNOWN_DATASET": 0,
+        "UNKNOWN": 0,
+    }
+
+    conn = connect()
+
+    try:
+        with open(results_file, newline="") as f:
+            reader = csv.DictReader(f)
+            required = {"dataset_id", "status"}
+            missing = required - set(reader.fieldnames or [])
+
+            if missing:
+                raise ValueError(
+                    f"Missing required columns: {', '.join(sorted(missing))}"
+                )
+
+            for row in reader:
+                dataset_id = row["dataset_id"]
+                status = row["status"]
+
+                if status in ("SUCCESS", "ALREADY_EXISTS"):
+                    updated = conn.execute(
+                        """
+                        UPDATE datasets
+                        SET archive_status       = 'SUCCESS',
+                            archive_completed_at = CURRENT_TIMESTAMP
+                        WHERE dataset_id = ? RETURNING dataset_id
+                        """,
+                        [dataset_id],
+                    ).fetchone()
+
+                    if updated is None:
+                        counts["UNKNOWN_DATASET"] += 1
+                        print(f"UNKNOWN DATASET: {dataset_id}")
+                    else:
+                        counts[status] += 1
+
+                elif status in ("CONFLICT", "FAILED"):
+                    counts[status] += 1
+                else:
+                    counts["UNKNOWN"] += 1
+                    print(f"UNKNOWN STATUS: {dataset_id}: {status}")
+    finally:
+        conn.close()
+
+    return counts
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Execute ESGF archive tasks."
+    )
+    parser.add_argument(
+        "task_file",
+        help="CSV file generated by pubflow archive",
+    )
+    parser.add_argument(
+        "--results",
+        default="archive_results.csv",
+        help="Output CSV for archive results",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be archived without copying files",
+    )
+
+    args = parser.parse_args()
+    results = archive_tasks(args.task_file, dry_run=args.dry_run)
+
+    with open(args.results, "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
                 "dataset_id",
                 "mapfile",
                 "archive_path",
-            ]
+                "status",
+                "error_message",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(results)
+
+    counts = {
+        "WOULD_ARCHIVE": sum(r["status"] == "WOULD_ARCHIVE" for r in results),
+        "SUCCESS": sum(r["status"] == "SUCCESS" for r in results),
+        "ALREADY_EXISTS": sum(
+            r["status"] == "ALREADY_EXISTS" for r in results
+        ),
+        "CONFLICT": sum(r["status"] == "CONFLICT" for r in results),
+        "FAILED": sum(r["status"] == "FAILED" for r in results),
+    }
+
+    print()
+
+    if args.dry_run:
+        print(
+            f"Dry run completed: "
+            f"{counts['WOULD_ARCHIVE']} would archive, "
+            f"{counts['ALREADY_EXISTS']} already existed, "
+            f"{counts['CONFLICT']} conflicts, "
+            f"{counts['FAILED']} failed"
+        )
+    else:
+        print(
+            f"Completed: "
+            f"{counts['SUCCESS']} succeeded, "
+            f"{counts['ALREADY_EXISTS']} already existed, "
+            f"{counts['CONFLICT']} conflicts, "
+            f"{counts['FAILED']} failed"
         )
 
-        for dataset_id, mapfile, archive_status in rows:
-            archive_path = get_archive_path(
-                dataset_id,
-                mapfile,
-                campaign,
-            )
 
-            writer.writerow(
-                [
-                    dataset_id,
-                    mapfile,
-                    str(archive_path),
-                ]
-            )
-
-            count += 1
-
-    return count
+if __name__ == "__main__":
+    main()

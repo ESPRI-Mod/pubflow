@@ -30,20 +30,16 @@ CREATE TABLE IF NOT EXISTS campaigns
     VARCHAR
 );
 
-
 CREATE TABLE IF NOT EXISTS datasets
 (
-
     dataset_id
     VARCHAR
     PRIMARY
     KEY,
-
     campaign
     VARCHAR
     NOT
     NULL,
-
     project
     VARCHAR
     NOT
@@ -56,45 +52,39 @@ CREATE TABLE IF NOT EXISTS datasets
     VARCHAR
     NOT
     NULL,
-
     drs
     JSON,
-
     mapfile
     VARCHAR
     NOT
     NULL,
-
     publication_status
     VARCHAR
     NOT
     NULL
     DEFAULT
     'PENDING',
-
     archive_status
     VARCHAR
     NOT
     NULL
     DEFAULT
     'PENDING',
-
+    archive_completed_at
+    TIMESTAMP,
     registered_at
     TIMESTAMP
     DEFAULT
     CURRENT_TIMESTAMP,
-
     FOREIGN
     KEY
 (
     campaign
-)
-    REFERENCES campaigns
+) REFERENCES campaigns
 (
     name
 )
     );
-
 
 CREATE TABLE IF NOT EXISTS files
 (   dataset_id VARCHAR,
@@ -103,10 +93,8 @@ CREATE TABLE IF NOT EXISTS files
     checksum    VARCHAR,
     mod_time    VARCHAR,
     PRIMARY KEY (dataset_id,file_path),
-    FOREIGN KEY (dataset_id)
-    REFERENCES datasets(dataset_id)
-);
 
+);
 CREATE TABLE IF NOT EXISTS publication_attempts
 (
     dataset_id VARCHAR,
@@ -116,7 +104,5 @@ CREATE TABLE IF NOT EXISTS publication_attempts
     status VARCHAR,
     exit_code INTEGER,
     log_file VARCHAR,
-    error_message VARCHAR,
-    FOREIGN KEY(dataset_id)
-        REFERENCES datasets(dataset_id)
+    error_message VARCHAR
 );
