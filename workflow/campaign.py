@@ -88,6 +88,3 @@ def get_campaign(name):
         "archive_root": row[5],
         "archive_depth": row[6],
     }
-
-if __name__ == "__main__":
-    load_campaigns()
