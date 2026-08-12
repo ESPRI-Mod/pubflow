@@ -42,3 +42,19 @@ campaigns:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/UiB
       depth: experiment_id
+
+  cmip6-ipsl-cm6a-lr-picontrol:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/piControl
+    archive:
+      enabled: false
+
+  cmip6-ipsl-cm6a-lr-1pctCO2:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/1pctCO2
+    archive:
+      enabled: false

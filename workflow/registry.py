@@ -9,6 +9,10 @@ def parse_drs(dataset_id, generator):
     parts = dataset_id.split(".")
     drs_parts = generator.directory_specs.parts
 
+    if len(parts) == len(drs_parts) - 1 and "#" in parts[-1]:
+        grid, version = parts[-1].split("#", 1)
+        parts[-1:] = [grid, f"v{version}"]
+
     if len(parts) != len(drs_parts):
         raise ValueError(
             f"Unexpected DRS format: dataset ID contains "
@@ -17,8 +21,8 @@ def parse_drs(dataset_id, generator):
         )
 
     return {
-        part.source_collection: value
-        for value, part in zip(parts, drs_parts)
+        drs_part.source_collection: value
+        for value, drs_part in zip(parts, drs_parts)
     }
 
 
