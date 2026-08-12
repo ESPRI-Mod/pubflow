@@ -1,91 +1,69 @@
 import json
+from pathlib import Path
+
 from esgvoc.apps.drs.generator import DrsGenerator
 
 
-def parse_drs(dataset_id):
-    """
-    Parse an ESGF dataset ID using the DRS specification provided
-    by ESGVOC.
-
-    The dataset ID components are mapped to the ordered DRS parts
-    defined by ESGVOC rather than using hardcoded facet names.
-    """
+def parse_drs(dataset_id, generator):
+    """Parse a dataset ID using an ESGVOC DRS generator."""
     parts = dataset_id.split(".")
-    if not parts:
-        raise ValueError(
-            f"Invalid dataset ID: {dataset_id}"
-        )
-
-    # The project identifier is the first DRS component and is
-    # also what ESGVOC expects when selecting the project.
-    project_id = parts[0].lower()
-    generator = DrsGenerator(
-        project_id
-    )
     drs_parts = generator.directory_specs.parts
+
     if len(parts) != len(drs_parts):
         raise ValueError(
             f"Unexpected DRS format: dataset ID contains "
             f"{len(parts)} components, but ESGVOC defines "
-            f"{len(drs_parts)} DRS components for {project_id}: "
-            f"{dataset_id}"
+            f"{len(drs_parts)} DRS components: {dataset_id}"
         )
-    mapping = {}
-    for value, drs_part in zip(parts, drs_parts):
-        mapping[drs_part.source_collection] = value
-    return mapping
+
+    return {
+        part.source_collection: value
+        for value, part in zip(parts, drs_parts)
+    }
 
 
-def parse_mapfile(mapfile):
-    """
-    Parse an ESGF mapfile.
-
-    Assumptions:
-    - one mapfile represents one dataset
-    - each line represents one file
-    """
+def parse_mapfile(mapfile, include_files=False):
+    """Parse an ESGF mapfile into a dataset ID and optional file metadata."""
     dataset_id = None
     files = []
+
     with open(mapfile) as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            fields = [
-                x.strip()
-                for x in line.split("|")
-            ]
+
+            fields = [x.strip() for x in line.split("|")]
             if len(fields) < 3:
                 raise ValueError(
                     f"Malformed mapfile line in {mapfile}: {line}"
                 )
+
             dataset = fields[0]
-            filepath = fields[1]
-            size = fields[2]
-            metadata = {}
-            for item in fields[3:]:
-                if "=" in item:
-                    key, value = item.split("=", 1)
-                    metadata[key.strip()] = value.strip()
+
             if dataset_id is None:
                 dataset_id = dataset
             elif dataset_id != dataset:
                 raise ValueError(
                     f"Multiple dataset IDs found in {mapfile}"
                 )
-            files.append(
-                {
-                    "file_path": filepath,
-                    "file_size": int(size),
+
+            if include_files:
+                metadata = {}
+                for item in fields[3:]:
+                    if "=" in item:
+                        key, value = item.split("=", 1)
+                        metadata[key.strip()] = value.strip()
+
+                files.append({
+                    "file_path": fields[1],
+                    "file_size": int(fields[2]),
                     "checksum": metadata.get("checksum"),
                     "mod_time": metadata.get("mod_time"),
-                }
-            )
+                })
 
     if dataset_id is None:
-        raise ValueError(
-            f"No dataset found in {mapfile}"
-        )
+        raise ValueError(f"No dataset found in {mapfile}")
 
     return dataset_id, files
 
@@ -104,42 +82,34 @@ DRS_FIELDS = [
 ]
 
 
-def build_drs_path(
-        dataset_id,
-        depth,
-):
-    drs = parse_drs(dataset_id)
+def build_drs_path(dataset_id, depth, generator):
+    """Build a DRS path up to the requested component."""
     if depth not in DRS_FIELDS:
         raise ValueError(
             f"Invalid archival depth: {depth}. "
             f"Expected one of: {', '.join(DRS_FIELDS)}"
         )
+
+    drs = parse_drs(dataset_id, generator)
     depth_index = DRS_FIELDS.index(depth)
 
-    return Path(
-        *(
-            drs[field]
-            for field in DRS_FIELDS[:depth_index + 1]
-        )
-    )
+    return Path(*(drs[field] for field in DRS_FIELDS[:depth_index + 1]))
+
 
 def register_dataset(
         conn,
         campaign_name,
         campaign,
-        mapfile
+        mapfile,
+        drs_generator,
+        register_files=False,
 ):
-    """
-    Register one dataset from one mapfile.
-    """
-
+    """Register one dataset from one mapfile."""
     dataset_id, files = parse_mapfile(
-        mapfile
+        mapfile,
+        include_files=register_files,
     )
-
-    drs = parse_drs(
-        dataset_id
-    )
+    drs = parse_drs(dataset_id, drs_generator)
 
     conn.execute(
         """
@@ -154,7 +124,6 @@ def register_dataset(
             drs,
             mapfile
         )
-
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         [
@@ -168,8 +137,8 @@ def register_dataset(
         ],
     )
 
-    for file in files:
-        conn.execute(
+    if register_files:
+        conn.executemany(
             """
             INSERT
             OR IGNORE INTO files
@@ -180,15 +149,17 @@ def register_dataset(
                 checksum,
                 mod_time
             )
-
             VALUES (?, ?, ?, ?, ?)
             """,
             [
-                dataset_id,
-                file["file_path"],
-                file["file_size"],
-                file["checksum"],
-                file["mod_time"],
+                (
+                    dataset_id,
+                    file["file_path"],
+                    file["file_size"],
+                    file["checksum"],
+                    file["mod_time"],
+                )
+                for file in files
             ],
         )
 

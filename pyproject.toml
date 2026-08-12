@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml",
     "typer",
     "requests",
+    "tqdm",
 ]
 
 [project.scripts]

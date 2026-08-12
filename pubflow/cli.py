@@ -1,5 +1,10 @@
-import typer
+import time
 from pathlib import Path
+
+import typer
+from esgvoc.apps.drs.generator import DrsGenerator
+from tqdm import tqdm
+
 from workflow.archive import generate_archive_tasks, import_archive_results
 from workflow.campaign import get_campaign, load_campaigns
 from workflow.database import connect
@@ -13,10 +18,23 @@ app = typer.Typer(
     help="ESGF publication workflow manager.",
     no_args_is_help=True,
 )
+
 campaign_app = typer.Typer(help="Campaign management commands.")
 grist_app = typer.Typer(help="Grist integration commands.")
+
 app.add_typer(campaign_app, name="campaign")
 app.add_typer(grist_app, name="grist")
+
+
+def format_duration(seconds):
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    if hours:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+
+    return f"{minutes}:{seconds:02d}"
 
 
 @campaign_app.command("load")
@@ -31,55 +49,98 @@ def campaign_load():
 
 
 @app.command()
-def register(campaign_name: str):
+def register(
+        campaign_name: str,
+        register_files: bool = typer.Option(
+            False,
+            "--register-files",
+            help="Also store file-level metadata.",
+        ),
+        batch_size: int = typer.Option(
+            100,
+            help="Mapfiles per database transaction.",
+        ),
+):
     """Register all mapfiles belonging to a campaign."""
-    try:
-        campaign = get_campaign(campaign_name)
-        mapfile_root = Path(campaign["mapfile_root"])
-        if not mapfile_root.exists():
-            raise ValueError(f"Mapfile root does not exist: {mapfile_root}")
-        mapfiles = list(mapfile_root.rglob("*.map"))
-        typer.echo(f"Found {len(mapfiles)} mapfiles")
-        conn = connect()
-        success = failed = 0
-        try:
-            for mapfile in mapfiles:
-                try:
-                    result = register_dataset(
-                        conn, campaign_name, campaign, mapfile
-                    )
-                    typer.echo(
-                        f"Registered {result['dataset_id']} "
-                        f"({result['files']} files)"
+    campaign = get_campaign(campaign_name)
+    mapfile_root = Path(campaign["mapfile_root"])
+
+    if not mapfile_root.exists():
+        raise typer.BadParameter(
+            f"Mapfile root does not exist: {mapfile_root}"
+        )
+
+    mapfiles = list(mapfile_root.rglob("*.map"))
+    typer.echo(f"Found {len(mapfiles)} mapfiles")
+
+    drs_generator = DrsGenerator(campaign["project"].lower())
+    conn = connect()
+
+    success = 0
+    failed = 0
+    start_total = time.monotonic()
+
+    with tqdm(
+            total=len(mapfiles),
+            desc="Registering",
+            unit="mapfile",
+    ) as progress:
+        for start in range(0, len(mapfiles), batch_size):
+            batch = mapfiles[start:start + batch_size]
+            conn.execute("BEGIN")
+
+            try:
+                for mapfile in batch:
+                    register_dataset(
+                        conn,
+                        campaign_name,
+                        campaign,
+                        mapfile,
+                        drs_generator,
+                        register_files=register_files,
                     )
                     success += 1
-                except Exception as exc:
-                    typer.echo(f"FAILED {mapfile}: {exc}")
-                    failed += 1
-        finally:
-            conn.close()
-        typer.echo(f"\nCompleted: {success} succeeded, {failed} failed")
-    except Exception as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=1)
+                    progress.update(1)
 
+                conn.execute("COMMIT")
 
-@app.command()
-def publish(
-        campaign: str,
-        limit: int | None = None,
-        batch_size: int = 50,
-        dry_run: bool = False,
-):
-    """Publish datasets belonging to a campaign."""
-    try:
-        if dry_run:
-            dry_run_campaign(campaign, limit=limit, batch_size=batch_size)
-        else:
-            publish_campaign(campaign, limit=limit, batch_size=batch_size)
-    except ValueError as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=1)
+            except Exception:
+                conn.execute("ROLLBACK")
+
+                for mapfile in batch:
+                    try:
+                        register_dataset(
+                            conn,
+                            campaign_name,
+                            campaign,
+                            mapfile,
+                            drs_generator,
+                            register_files=register_files,
+                        )
+                        conn.execute("COMMIT")
+                        success += 1
+
+                    except Exception as exc:
+                        conn.execute("ROLLBACK")
+                        failed += 1
+                        typer.echo(f"FAILED {mapfile}: {exc}")
+
+                    progress.update(1)
+
+    conn.close()
+
+    elapsed = time.monotonic() - start_total
+    rate = success / elapsed if elapsed else 0
+
+    typer.echo("")
+    typer.echo("Registration complete")
+    typer.echo(f"  Succeeded:      {success}")
+    typer.echo(f"  Failed:         {failed}")
+    typer.echo(f"  Duration:       {format_duration(elapsed)}")
+    typer.echo(f"  Rate:           {rate:.2f} mapfiles/s")
+    typer.echo(
+        f"  File metadata:  {'enabled' if register_files else 'disabled'}"
+    )
 
 
 @app.command()
@@ -90,6 +151,7 @@ def validate(campaign: str, limit: int | None = None):
     except ValueError as exc:
         typer.echo(f"ERROR: {exc}", err=True)
         raise typer.Exit(code=1)
+
     if not success:
         raise typer.Exit(code=1)
 
@@ -159,7 +221,9 @@ def archive(
     """Generate archive tasks for successfully published datasets."""
     try:
         count = generate_archive_tasks(
-            campaign_name, output=output, limit=limit
+            campaign_name,
+            output=output,
+            limit=limit,
         )
         typer.echo(f"Generated {count} archive tasks")
         typer.echo(f"Output: {output}")
