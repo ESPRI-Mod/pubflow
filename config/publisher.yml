@@ -1,18 +1,15 @@
 publisher:
-
   executable: esgpublish
-
   arguments: [ ]
-
   batch:
     size: 50
-
   execution:
     dry_run: false
-
   logging:
     directory: /home/esguser/esgf-publisher-workflow/logs
-
   retry:
     enabled: true
     max_attempts: 3
+  mapfile_path_mappings:
+    - from: /ccc/work/cont003/cmip6/cmip6
+      to: /mnt/tgcc/

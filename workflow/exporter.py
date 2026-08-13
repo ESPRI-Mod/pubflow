@@ -1,8 +1,9 @@
 import csv
 
 from workflow.database import connect
-from workflow.grist import add_records, get_records, update_records
+from workflow.grist import add_records_batched, get_records, update_records_batched
 
+GRIST_BATCH_SIZE = 100
 
 def get_campaign_status_rows():
     conn = connect()
@@ -287,15 +288,17 @@ def sync_campaigns_to_grist(
             )
 
     if creates:
-        add_records(
+        add_records_batched(
             table_id,
             creates,
+            batch_size=GRIST_BATCH_SIZE
         )
 
     if updates:
-        update_records(
+        update_records_batched(
             table_id,
             updates,
+            batch_size=GRIST_BATCH_SIZE
         )
 
 
@@ -366,15 +369,17 @@ def sync_datasets_to_grist(
             )
 
     if creates:
-        add_records(
+        add_records_batched(
             table_id,
             creates,
+            batch_size=GRIST_BATCH_SIZE
         )
 
     if updates:
-        update_records(
+        update_records_batched(
             table_id,
             updates,
+            batch_size=GRIST_BATCH_SIZE
         )
 
 
@@ -447,15 +452,17 @@ def sync_failures_to_grist(
             )
 
     if creates:
-        add_records(
+        add_records_batched(
             table_id,
             creates,
+            batch_size=GRIST_BATCH_SIZE
         )
 
     if updates:
-        update_records(
+        update_records_batched(
             table_id,
             updates,
+            batch_size=GRIST_BATCH_SIZE
         )
 
 

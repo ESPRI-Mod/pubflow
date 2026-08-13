@@ -1,11 +1,13 @@
 import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
-from datetime import datetime
+
 from workflow.config import get_publisher_config
 from workflow.database import connect, update_dataset_status
 from workflow.result import PublicationResult
 from workflow.summary import PublicationSummary
+
 
 def create_run_id(campaign):
     timestamp = datetime.today().strftime("%Y%m%d%H%M%S")
@@ -14,8 +16,15 @@ def create_run_id(campaign):
 
 def get_run_log_file(campaign, run_id):
     publisher = get_publisher_config()
-    directory = (Path(publisher["logging"]["directory"]) / campaign)
-    directory.mkdir(parents=True, exist_ok=True)
+    directory = Path(
+        publisher["logging"]["directory"]
+    ) / campaign
+
+    directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
     return directory / f"{run_id}.log"
 
 
@@ -24,6 +33,7 @@ def get_campaign_datasets(
         limit=None,
 ):
     conn = connect()
+
     query = """
             SELECT dataset_id,
                    mapfile,
@@ -31,19 +41,86 @@ def get_campaign_datasets(
             FROM datasets
             WHERE campaign = ?
               AND publication_status = 'PENDING'
-
             ORDER BY dataset_id \
             """
+
     params = [campaign]
+
     if limit is not None:
         query += " LIMIT ?"
         params.append(limit)
+
     rows = conn.execute(
         query,
         params,
     ).fetchall()
+
     conn.close()
+
     return rows
+
+
+def get_mapfile_path_mappings():
+    publisher = get_publisher_config()
+
+    return publisher.get(
+        "mapfile_path_mappings",
+        [],
+    )
+
+
+def rewrite_mapfile(
+        source_mapfile,
+        destination_mapfile,
+):
+    """
+    Create a temporary mapfile with configured filesystem
+    path mappings applied to file paths.
+
+    The source mapfile is never modified.
+    """
+
+    mappings = get_mapfile_path_mappings()
+
+    with open(source_mapfile) as source, open(
+            destination_mapfile,
+            "w",
+    ) as destination:
+
+        for line in source:
+            stripped = line.rstrip("\n")
+
+            if not stripped:
+                destination.write(line)
+                continue
+
+            fields = stripped.split("|")
+
+            if len(fields) >= 2:
+                file_path = fields[1].strip()
+
+                for mapping in mappings:
+                    source_root = mapping["from"]
+                    target_root = mapping["to"]
+
+                    if file_path == source_root:
+                        file_path = target_root
+                        break
+
+                    if file_path.startswith(
+                            source_root.rstrip("/") + "/"
+                    ):
+                        file_path = (
+                                target_root.rstrip("/")
+                                + file_path[len(source_root):]
+                        )
+                        break
+
+                fields[1] = f" {file_path} "
+
+            destination.write(
+                "|".join(fields) + "\n"
+            )
 
 
 def build_publish_command(mapfile):
@@ -63,34 +140,18 @@ def build_publish_command(mapfile):
     command.extend(
         [
             "--map",
-            str(mapfile)
+            str(mapfile),
         ]
     )
 
     return command
 
 
-def get_log_file(dataset_id):
-    publisher = get_publisher_config()
-
-    directory = Path(
-        publisher["logging"]["directory"]
-    )
-
-    directory.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    safe_id = dataset_id.replace(
-        "/",
-        "_"
-    )
-
-    return directory / f"{safe_id}.log"
-
-
-def create_attempt(conn, dataset_id, run_id):
+def create_attempt(
+        conn,
+        dataset_id,
+        run_id,
+):
     conn.execute(
         """
         INSERT INTO publication_attempts
@@ -98,7 +159,6 @@ def create_attempt(conn, dataset_id, run_id):
          run_id,
          started_at,
          status)
-
         VALUES (?, ?, ?, ?)
         """,
         [
@@ -149,62 +209,95 @@ def dry_run_campaign(
         limit=None,
         batch_size=50,
 ):
-    datasets = get_campaign_datasets(
-        campaign,
-        limit=limit,
-    )
-
+    datasets = get_campaign_datasets(campaign, limit=limit)
     total = len(datasets)
-
     print()
-    print(
-        f"Campaign: {campaign}"
-    )
-    print(
-        f"Datasets selected: {total}"
-    )
-    print(
-        f"Batch size: {batch_size}"
-    )
+    print(f"Campaign: {campaign}")
+    print(f"Datasets selected: {total}")
+    print(f"Batch size: {batch_size}")
     print()
-
+    mappings = get_mapfile_path_mappings()
+    if mappings:
+        print("Mapfile path mappings:")
+        for mapping in mappings:
+            print(f"  {mapping['from']} -> {mapping['to']}")
+        print()
     for batch_start in range(
             0,
             total,
             batch_size,
     ):
-        batch = datasets[
-            batch_start:batch_start + batch_size
-        ]
-
-        batch_number = (
-                               batch_start // batch_size
-                       ) + 1
-
-        print(
-            f"=== Batch {batch_number} "
-            f"({len(batch)} datasets) ==="
-        )
-
+        batch = datasets[batch_start:batch_start + batch_size]
+        batch_number = (batch_start // batch_size) + 1
+        print(f"=== Batch {batch_number} "
+            f"({len(batch)} datasets) ===")
         for dataset_id, mapfile, status in batch:
-            command = build_publish_command(
-                mapfile
-            )
-
-            print(
-                f"[DRY-RUN] {dataset_id}"
-            )
-
-            print(
-                f"  status : {status}"
-            )
-
-            print(
-                f"  command: {' '.join(command)}"
-            )
-
+            print(f"[DRY-RUN] {dataset_id}")
+            print(f"  status : {status}")
+            print(f"  source mapfile: {mapfile}")
+            with tempfile.TemporaryDirectory(
+                    prefix="pubflow-dry-run-"
+            ) as temp_dir:
+                effective_mapfile = (
+                        Path(temp_dir)
+                        / Path(mapfile).name
+                )
+                rewrite_mapfile(
+                    mapfile,
+                    effective_mapfile,
+                )
+                original_paths = []
+                rewritten_paths = []
+                with open(mapfile) as original:
+                    for line in original:
+                        fields = line.rstrip("\n").split("|")
+                        if len(fields) >= 2:
+                            original_paths.append(
+                                fields[1].strip()
+                            )
+                with open(effective_mapfile) as rewritten:
+                    for line in rewritten:
+                        fields = line.rstrip("\n").split("|")
+                        if len(fields) >= 2:
+                            rewritten_paths.append(
+                                fields[1].strip()
+                            )
+                changed = 0
+                for original_path, rewritten_path in zip(
+                        original_paths,
+                        rewritten_paths,
+                ):
+                    if original_path != rewritten_path:
+                        changed += 1
+                print(
+                    f"  effective mapfile: "
+                    f"{effective_mapfile}"
+                )
+                print(
+                    f"  paths rewritten: "
+                    f"{changed}/{len(original_paths)}"
+                )
+                if changed:
+                    print("  example:")
+                    for original_path, rewritten_path in zip(
+                            original_paths,
+                            rewritten_paths,
+                    ):
+                        if original_path != rewritten_path:
+                            print(
+                                f"    {original_path}"
+                            )
+                            print(
+                                f"      -> {rewritten_path}"
+                            )
+                            break
+                command = build_publish_command(
+                    effective_mapfile
+                )
+                print(
+                    f"  command: {' '.join(command)}"
+                )
         print()
-
 
 def publish_dataset(
         dataset_id,
@@ -220,40 +313,93 @@ def publish_dataset(
         run_id,
     )
     conn.commit()
-    command = build_publish_command(mapfile)
+
     try:
-        with open(log_file,"a") as log:
-            log.write("\n" + "-" * 70 + "\n")
-            log.write(f"Dataset: {dataset_id}\n")
-            log.write(f"Mapfile: {mapfile}\n")
-            log.write(f"Command: {' '.join(command)}\n")
-            log.write("-" * 70 + "\n")
-            result = subprocess.run(
-                command,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                text=True,
+        with tempfile.TemporaryDirectory(
+                prefix="pubflow-"
+        ) as temp_dir:
+
+            effective_mapfile = (
+                    Path(temp_dir)
+                    / Path(mapfile).name
             )
+
+            rewrite_mapfile(
+                mapfile,
+                effective_mapfile,
+            )
+
+            command = build_publish_command(
+                effective_mapfile
+            )
+
+            with open(
+                    log_file,
+                    "a",
+            ) as log:
+                log.write(
+                    "\n" + "-" * 70 + "\n"
+                )
+                log.write(
+                    f"Dataset: {dataset_id}\n"
+                )
+                log.write(
+                    f"Original mapfile: {mapfile}\n"
+                )
+                log.write(
+                    f"Effective mapfile: "
+                    f"{effective_mapfile}\n"
+                )
+                log.write(
+                    f"Command: {' '.join(command)}\n"
+                )
+                log.write(
+                    "-" * 70 + "\n"
+                )
+
+                result = subprocess.run(
+                    command,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+
         if result.returncode == 0:
             status = "SUCCESS"
         else:
             status = "FAILED"
-        update_dataset_status(conn, dataset_id, status)
-        finish_attempt(conn, dataset_id, run_id, status,
-                       result.returncode, str(log_file))
+
+        update_dataset_status(
+            conn,
+            dataset_id,
+            status,
+        )
+
+        finish_attempt(
+            conn,
+            dataset_id,
+            run_id,
+            status,
+            result.returncode,
+            str(log_file),
+        )
+
         conn.commit()
+
         return PublicationResult(
             dataset_id=dataset_id,
             status=status,
             exit_code=result.returncode,
-            log_file=str(log_file)
+            log_file=str(log_file),
         )
+
     except Exception as exc:
         update_dataset_status(
             conn,
             dataset_id,
             "FAILED",
         )
+
         finish_attempt(
             conn,
             dataset_id,
@@ -263,7 +409,9 @@ def publish_dataset(
             str(log_file),
             str(exc),
         )
+
         conn.commit()
+
         return PublicationResult(
             dataset_id=dataset_id,
             status="FAILED",
@@ -271,6 +419,7 @@ def publish_dataset(
             log_file=str(log_file),
             error_message=str(exc),
         )
+
     finally:
         conn.close()
 
@@ -281,112 +430,193 @@ def publish_campaign(
         batch_size=50,
 ):
     run_id = create_run_id(campaign)
-    summary = PublicationSummary(campaign=campaign, run_id=run_id)
-    log_file = get_run_log_file(campaign, run_id)
+
+    summary = PublicationSummary(
+        campaign=campaign,
+        run_id=run_id,
+    )
+
+    log_file = get_run_log_file(
+        campaign,
+        run_id,
+    )
+
     success_count = 0
     failed_count = 0
     processed_count = 0
+
     with open(log_file, "w") as log:
         log.write(
             "=" * 70 + "\n"
         )
-        log.write("ESGF Publisher Workflow\n")
-        log.write(f"Campaign: {campaign}\n")
-        log.write(f"Run ID: {run_id}\n")
-        log.write(f"Started: {datetime.now()}\n")
-        log.write(f"Batch size: {batch_size}\n")
+        log.write(
+            "ESGF Publisher Workflow\n"
+        )
+        log.write(
+            f"Campaign: {campaign}\n"
+        )
+        log.write(
+            f"Run ID: {run_id}\n"
+        )
+        log.write(
+            f"Started: {datetime.now()}\n"
+        )
+        log.write(
+            f"Batch size: {batch_size}\n"
+        )
 
         if limit is not None:
-            log.write(f"Limit: {limit}\n")
-        log.write("=" * 70 + "\n\n")
+            log.write(
+                f"Limit: {limit}\n"
+            )
+
+        mappings = get_mapfile_path_mappings()
+
+        if mappings:
+            log.write(
+                "\nMapfile path mappings:\n"
+            )
+
+            for mapping in mappings:
+                log.write(
+                    f"  {mapping['from']} -> "
+                    f"{mapping['to']}\n"
+                )
+
+        log.write(
+            "=" * 70 + "\n\n"
+        )
+
     total_processed = 0
     batch_number = 0
+
     while True:
         remaining = None
+
         if limit is not None:
-            remaining = (limit - total_processed)
+            remaining = (
+                    limit - total_processed
+            )
+
             if remaining <= 0:
                 break
+
         current_batch_size = batch_size
+
         if remaining is not None:
-            current_batch_size = min(batch_size, remaining)
-        datasets = get_campaign_datasets(campaign,
-                                         limit=current_batch_size)
+            current_batch_size = min(
+                batch_size,
+                remaining,
+            )
+
+        datasets = get_campaign_datasets(
+            campaign,
+            limit=current_batch_size,
+        )
+
         if not datasets:
             break
+
         batch_number += 1
+
         print()
         print(
             f"=== Batch {batch_number} "
             f"({len(datasets)} datasets) ==="
         )
         print()
+
         for dataset_id, mapfile, status in datasets:
-            result = publish_dataset(dataset_id, mapfile,
-                                     run_id, log_file)
+
+            result = publish_dataset(
+                dataset_id,
+                mapfile,
+                run_id,
+                log_file,
+            )
+
             summary.add_result(result)
             processed_count += 1
-            if result.status == "SUCCESS":
-                print(f"SUCCESS {result.dataset_id}")
-                success_count += 1
-            elif result.status == "FAILED":
-                print(f"FAILED {result.dataset_id}: "
-                    f"(exit code: {result.exit_code})")
-                if result.error_message:
-                    print(f"Error: {result.error_message}")
-                print(f"Log: {result.log_file}")
-                failed_count += 1
             total_processed += 1
-        print()
-        print(f"Batch {batch_number} complete")
-        print()
-        print("=" * 60)
-        print("Publication run complete")
-        print("=" * 60)
-        print(
-            f"Campaign: {summary.campaign}"
-        )
-        print(
-            f"Run ID: {summary.run_id}"
-        )
-        print()
-        print(
-            f"Total:   {summary.total}"
-        )
-        print(
-            f"Success: {summary.success}"
-        )
-        print(
-            f"Failed:  {summary.failed}"
-        )
-        if summary.failures:
-            print()
-            print("Failed datasets:")
-            for failure in summary.failures:
+
+            if result.status == "SUCCESS":
                 print(
-                    f"  - {failure.dataset_id} "
-                    f"(exit code {failure.exit_code})"
+                    f"SUCCESS {result.dataset_id}"
                 )
+                success_count += 1
+
+            else:
+                print(
+                    f"FAILED {result.dataset_id} "
+                    f"(exit code: {result.exit_code})"
+                )
+
+                if result.error_message:
+                    print(
+                        f"Error: {result.error_message}"
+                    )
+
+                print(
+                    f"Log: {result.log_file}"
+                )
+
+                failed_count += 1
+
+        print()
+        print(
+            f"Batch {batch_number} complete"
+        )
+
+    print()
+    print("=" * 60)
+    print("Publication run complete")
+    print("=" * 60)
+    print(
+        f"Campaign: {summary.campaign}"
+    )
+    print(
+        f"Run ID: {summary.run_id}"
+    )
+    print()
+    print(
+        f"Total:   {summary.total}"
+    )
+    print(
+        f"Success: {summary.success}"
+    )
+    print(
+        f"Failed:  {summary.failed}"
+    )
+
+    if summary.failures:
+        print()
+        print("Failed datasets:")
+
+        for failure in summary.failures:
+            print(
+                f"  - {failure.dataset_id} "
+                f"(exit code {failure.exit_code})"
+            )
+
     print()
     print(
         f"Total datasets processed: "
         f"{total_processed}"
     )
+
     with open(
             log_file,
             "a",
     ) as log:
+
         log.write(
-            "\n"
-            + "=" * 70
-            + "\n"
+            "\n" + "=" * 70 + "\n"
         )
         log.write(
             "RUN COMPLETE\n"
         )
         log.write(
-            "=" * 70
-            + "\n"
+            "=" * 70 + "\n"
         )
         log.write(
             f"Campaign: {campaign}\n"
@@ -398,9 +628,6 @@ def publish_campaign(
             f"Finished: {datetime.now()}\n"
         )
         log.write(
-            "\n"
-        )
-        log.write(
             f"Processed: {processed_count}\n"
         )
         log.write(
@@ -410,6 +637,5 @@ def publish_campaign(
             f"FAILED:    {failed_count}\n"
         )
         log.write(
-            "=" * 70
-            + "\n"
+            "=" * 70 + "\n"
         )

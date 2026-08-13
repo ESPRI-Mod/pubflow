@@ -144,6 +144,33 @@ def register(
 
 
 @app.command()
+def publish(
+        campaign: str,
+        limit: int | None = None,
+        batch_size: int = 50,
+        dry_run: bool = False,
+):
+    """Publish datasets belonging to a campaign."""
+    try:
+        if dry_run:
+            dry_run_campaign(
+                campaign,
+                limit=limit,
+                batch_size=batch_size,
+            )
+        else:
+            publish_campaign(
+                campaign,
+                limit=limit,
+                batch_size=batch_size,
+            )
+
+    except ValueError as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def validate(campaign: str, limit: int | None = None):
     """Validate datasets belonging to a campaign."""
     try:
