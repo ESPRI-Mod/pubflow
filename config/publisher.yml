@@ -1,6 +1,6 @@
 publisher:
   executable: esgpublish
-  arguments: [ ]
+  arguments: [ --no-xarray ]
   batch:
     size: 50
   execution:

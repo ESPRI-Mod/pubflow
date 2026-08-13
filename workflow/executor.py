@@ -1,5 +1,6 @@
 import subprocess
 import tempfile
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -299,6 +300,7 @@ def dry_run_campaign(
                 )
         print()
 
+
 def publish_dataset(
         dataset_id,
         mapfile,
@@ -306,33 +308,27 @@ def publish_dataset(
         log_file,
 ):
     conn = connect()
-
     create_attempt(
         conn,
         dataset_id,
         run_id,
     )
     conn.commit()
-
     try:
         with tempfile.TemporaryDirectory(
                 prefix="pubflow-"
         ) as temp_dir:
-
             effective_mapfile = (
                     Path(temp_dir)
                     / Path(mapfile).name
             )
-
             rewrite_mapfile(
                 mapfile,
                 effective_mapfile,
             )
-
             command = build_publish_command(
                 effective_mapfile
             )
-
             with open(
                     log_file,
                     "a",
@@ -347,8 +343,7 @@ def publish_dataset(
                     f"Original mapfile: {mapfile}\n"
                 )
                 log.write(
-                    f"Effective mapfile: "
-                    f"{effective_mapfile}\n"
+                    f"Effective mapfile: {effective_mapfile}\n"
                 )
                 log.write(
                     f"Command: {' '.join(command)}\n"
@@ -356,25 +351,32 @@ def publish_dataset(
                 log.write(
                     "-" * 70 + "\n"
                 )
-
                 result = subprocess.run(
                     command,
-                    stdout=log,
+                    stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
                 )
-
+                log.write(result.stdout)
         if result.returncode == 0:
             status = "SUCCESS"
+            error_message = None
         else:
             status = "FAILED"
+            error_message = extract_error_message(
+                result.stdout
+            )
 
+            if error_message is None:
+                error_message = (
+                    f"esgpublish exited with code "
+                    f"{result.returncode}"
+                )
         update_dataset_status(
             conn,
             dataset_id,
             status,
         )
-
         finish_attempt(
             conn,
             dataset_id,
@@ -382,24 +384,25 @@ def publish_dataset(
             status,
             result.returncode,
             str(log_file),
+            error_message,
         )
-
         conn.commit()
-
         return PublicationResult(
             dataset_id=dataset_id,
             status=status,
             exit_code=result.returncode,
             log_file=str(log_file),
+            error_message=error_message,
         )
-
     except Exception as exc:
+        error_message = (
+            f"{type(exc).__name__}: {exc}"
+        )
         update_dataset_status(
             conn,
             dataset_id,
             "FAILED",
         )
-
         finish_attempt(
             conn,
             dataset_id,
@@ -407,22 +410,40 @@ def publish_dataset(
             "FAILED",
             -1,
             str(log_file),
-            str(exc),
+            error_message,
         )
-
         conn.commit()
-
         return PublicationResult(
             dataset_id=dataset_id,
             status="FAILED",
             exit_code=-1,
             log_file=str(log_file),
-            error_message=str(exc),
+            error_message=error_message,
         )
-
     finally:
         conn.close()
 
+
+def extract_error_message(output):
+    if not output:
+        return None
+    lines = output.splitlines()
+    error_lines = [
+        line.strip()
+        for line in lines
+        if " ERROR " in line
+           or line.startswith("ERROR")
+    ]
+    if error_lines:
+        return error_lines[-1]
+    fail_lines = [
+        line.strip()
+        for line in lines
+        if "PUB_STATUS=FAIL" in line
+    ]
+    if fail_lines:
+        return fail_lines[-1]
+    return None
 
 def publish_campaign(
         campaign,
@@ -587,55 +608,69 @@ def publish_campaign(
     print(
         f"Failed:  {summary.failed}"
     )
-
     if summary.failures:
         print()
         print("Failed datasets:")
-
         for failure in summary.failures:
-            print(
-                f"  - {failure.dataset_id} "
-                f"(exit code {failure.exit_code})"
-            )
+            print(f"  - {failure.dataset_id} "
+                f"(exit code {failure.exit_code})")
 
     print()
-    print(
-        f"Total datasets processed: "
-        f"{total_processed}"
+    print(f"Total datasets processed: "
+        f"{total_processed}")
+    with open(log_file, "a") as log:
+        log.write("\n" + "=" * 70 + "\n")
+        log.write("RUN COMPLETE\n")
+        log.write("=" * 70 + "\n")
+        log.write(f"Campaign: {campaign}\n")
+        log.write(f"Run ID: {run_id}\n")
+        log.write(f"Finished: {datetime.now()}\n")
+        log.write(f"Processed: {processed_count}\n")
+        log.write(f"SUCCESS:   {success_count}\n")
+        log.write(f"FAILED:    {failed_count}\n")
+        log.write("=" * 70 + "\n")
+
+    print("Triggering asynchronous Grist sync...")
+    try:
+        sync_log = trigger_grist_sync(
+            campaign,
+            run_id,
+        )
+        print(
+            f"Grist sync started "
+            f"(log: {sync_log})"
+        )
+    except Exception as exc:
+        print(
+            f"WARNING: Could not trigger "
+            f"Grist sync: {exc}"
+        )
+
+def trigger_grist_sync(campaign, run_id):
+    publisher = get_publisher_config()
+    log_dir = (
+            Path(publisher["logging"]["directory"])
+            / campaign
     )
-
-    with open(
-            log_file,
-            "a",
-    ) as log:
-
-        log.write(
-            "\n" + "=" * 70 + "\n"
+    log_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    sync_log = (
+            log_dir
+            / f"{run_id}-grist-sync.log"
+    )
+    with open(sync_log, "a") as log:
+        subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "pubflow.cli",
+                "grist",
+                "sync",
+            ],
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
         )
-        log.write(
-            "RUN COMPLETE\n"
-        )
-        log.write(
-            "=" * 70 + "\n"
-        )
-        log.write(
-            f"Campaign: {campaign}\n"
-        )
-        log.write(
-            f"Run ID: {run_id}\n"
-        )
-        log.write(
-            f"Finished: {datetime.now()}\n"
-        )
-        log.write(
-            f"Processed: {processed_count}\n"
-        )
-        log.write(
-            f"SUCCESS:   {success_count}\n"
-        )
-        log.write(
-            f"FAILED:    {failed_count}\n"
-        )
-        log.write(
-            "=" * 70 + "\n"
-        )
+    return sync_log
