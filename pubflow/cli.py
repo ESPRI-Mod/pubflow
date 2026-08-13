@@ -8,7 +8,7 @@ from tqdm import tqdm
 from workflow.archive import generate_archive_tasks, import_archive_results
 from workflow.campaign import get_campaign, load_campaigns
 from workflow.database import connect
-from workflow.executor import dry_run_campaign, publish_campaign
+from workflow.executor import dry_run_campaign, publish_campaign, retry_campaign
 from workflow.exporter import export_campaign_status, sync_to_grist
 from workflow.grist import check_connection, get_table_columns, list_tables
 from workflow.registry import register_dataset
@@ -274,6 +274,24 @@ def archive_import(results_file: str):
         typer.echo(f"ERROR: {exc}", err=True)
         raise typer.Exit(code=1)
 
+
+@app.command("retry")
+def retry(
+        campaign: str,
+        limit: int = typer.Option(
+            None,
+            "--limit",
+            "-l",
+        ),
+):
+    """Reset failed datasets to PENDING for retry."""
+    try:
+        count = retry_campaign(campaign, limit=limit)
+        typer.echo(f"Reset {count} failed datasets "
+            f"to PENDING.")
+    except Exception as exc:
+        typer.echo(f"ERROR: {exc}", err=True,)
+        raise typer.Exit(code=1)
 
 @app.command()
 def version():

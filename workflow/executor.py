@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from workflow.config import get_publisher_config
-from workflow.database import connect, update_dataset_status
+from workflow.database import connect, update_dataset_status, retry_failed_datasets
 from workflow.result import PublicationResult
 from workflow.summary import PublicationSummary
 
@@ -674,3 +674,12 @@ def trigger_grist_sync(campaign, run_id):
             start_new_session=True,
         )
     return sync_log
+
+
+def retry_campaign(campaign, limit=None):
+    conn = connect()
+    try:
+        count = retry_failed_datasets(conn, campaign, limit=limit,)
+        return count
+    finally:
+        conn.close()
