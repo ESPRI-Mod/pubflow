@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from workflow.config import get_publisher_config
+from workflow.config import get_publisher_config, get_active_esg_config
 from workflow.database import connect, update_dataset_status, retry_failed_datasets
 from workflow.result import PublicationResult
 from workflow.summary import PublicationSummary
@@ -34,7 +34,6 @@ def get_campaign_datasets(
         limit=None,
 ):
     conn = connect()
-
     query = """
             SELECT dataset_id,
                    mapfile,
@@ -126,33 +125,15 @@ def rewrite_mapfile(
 
 def build_publish_command(mapfile):
     publisher = get_publisher_config()
-
-    command = [
-        publisher["executable"]
-    ]
-
-    command.extend(
-        publisher.get(
-            "arguments",
-            []
-        )
-    )
-
-    command.extend(
-        [
-            "--map",
-            str(mapfile),
-        ]
-    )
-
+    command = [publisher["executable"]]
+    command.extend(publisher.get("arguments", []))
+    profile, esg_config = get_active_esg_config()
+    command.extend(["--config", str(esg_config),])
+    command.extend(["--map", str(mapfile),])
     return command
 
 
-def create_attempt(
-        conn,
-        dataset_id,
-        run_id,
-):
+def create_attempt(conn, dataset_id, run_id,):
     conn.execute(
         """
         INSERT INTO publication_attempts
@@ -461,48 +442,31 @@ def publish_campaign(
         campaign,
         run_id,
     )
-
+    profile, esg_config = get_active_esg_config()
     success_count = 0
     failed_count = 0
     processed_count = 0
 
     with open(log_file, "w") as log:
-        log.write(
-            "=" * 70 + "\n"
-        )
-        log.write(
-            "ESGF Publisher Workflow\n"
-        )
-        log.write(
-            f"Campaign: {campaign}\n"
-        )
-        log.write(
-            f"Run ID: {run_id}\n"
-        )
-        log.write(
-            f"Started: {datetime.now()}\n"
-        )
-        log.write(
-            f"Batch size: {batch_size}\n"
-        )
-
+        log.write("=" * 70 + "\n")
+        log.write("ESGF Publisher Workflow\n")
+        log.write(f"Campaign: {campaign}\n")
+        log.write(f"Run ID: {run_id}\n")
+        log.write(f"Started: {datetime.now()}\n")
+        log.write(f"Batch size: {batch_size}\n")
+        log.write(f"ESG publisher profile: {profile}\n")
+        log.write(f"ESG publisher config: {esg_config}\n")
         if limit is not None:
-            log.write(
-                f"Limit: {limit}\n"
-            )
-
+            log.write(f"Limit: {limit}\n")
         mappings = get_mapfile_path_mappings()
-
         if mappings:
             log.write(
                 "\nMapfile path mappings:\n"
             )
 
             for mapping in mappings:
-                log.write(
-                    f"  {mapping['from']} -> "
-                    f"{mapping['to']}\n"
-                )
+                log.write( f"  {mapping['from']} -> "
+                    f"{mapping['to']}\n")
 
         log.write(
             "=" * 70 + "\n\n"
@@ -548,14 +512,12 @@ def publish_campaign(
         print()
 
         for dataset_id, mapfile, status in datasets:
-
             result = publish_dataset(
                 dataset_id,
                 mapfile,
                 run_id,
                 log_file,
             )
-
             summary.add_result(result)
             processed_count += 1
             total_processed += 1

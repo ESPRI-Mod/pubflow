@@ -1,48 +1,31 @@
 campaigns:
-
   tipmip-cnrm:
-
     project: CMIP6Plus
     activity: TIPMIP
     institution: CNRM-CERFACS
-
     mapfile_root: /modfs/esgf/topublish/CNRM-CERFACS/.mapfiles
-
     archive:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/CNRM-CERFACS
       depth: experiment_id
-
   tipmip-ubern:
-
     project: CMIP6Plus
     activity: TIPMIP
     institution: UBERN
-
     mapfile_root: /modfs/esgf/topublish/UBERN/.mapfiles
-
-
-
     archive:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/UBERN
       depth: experiment_id
-
-
   tipmip-uib:
-
     project: CMIP6Plus
     activity: TIPMIP
     institution: UiB
-
     mapfile_root: /modfs/esgf/topublish/UiB/.mapfiles
-
-
     archive:
       enabled: true
       root: /mnt/scality/WCRP/CMIP6Plus/TIPMIP/UiB
       depth: experiment_id
-
   cmip6-ipsl-cm6a-lr-picontrol:
     project: CMIP6
     activity: CMIP
@@ -50,11 +33,1068 @@ campaigns:
     mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/piControl
     archive:
       enabled: false
-
-  cmip6-ipsl-cm6a-lr-1pctCO2:
+  cmip6-ipsl-cm6a-lr-1pctco2:
     project: CMIP6
     activity: CMIP
     institution: IPSL
     mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/1pctCO2
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-lr-abrupt-4xco2:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/abrupt-4xCO2
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-lr-amip:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/amip
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-lr-historical:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/historical
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-lr-historical-ext:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/historical-EXT
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-lr-picontrol-spinup:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR/piControl-spinup
+    archive:
+      enabled: false
+  cmip6-ipsl-cm5a2-inca-1pctco2:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM5A2-INCA/1pctCO2
+    archive:
+      enabled: false
+  cmip6-ipsl-cm5a2-inca-abrupt-4xco2:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM5A2-INCA/abrupt-4xCO2
+    archive:
+      enabled: false
+  cmip6-ipsl-cm5a2-inca-historical:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM5A2-INCA/historical
+    archive:
+      enabled: false
+  cmip6-ipsl-cm5a2-inca-picontrol:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM5A2-INCA/piControl
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-lr-inca-abrupt-4xco2:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR-INCA/abrupt-4xCO2
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-lr-inca-historical:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-LR-INCA/historical
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-mr1-1pctco2:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-MR1/1pctCO2
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-mr1-abrupt-4xco2:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-MR1/abrupt-4xCO2
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-mr1-amip:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-MR1/amip
+    archive:
+      enabled: false
+  cmip6-ipsl-cm6a-mr1-picontrol:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CMIP/IPSL/IPSL-CM6A-MR1/piControl
+    archive:
+      enabled: false
+
+# DCPP
+
+  cmip6-dcpp-ipsl-cm6a-lr-dcppa-hindcast:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppA-hindcast
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-amv-extrop-neg:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-amv-ExTrop-neg
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-amv-extrop-pos:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-amv-ExTrop-pos
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-amv-neg:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-amv-neg
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-amv-pos:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-amv-pos
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-amv-trop-neg:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-amv-Trop-neg
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-amv-trop-pos:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-amv-Trop-pos
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-atl-control:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-atl-control
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-atl-pacemaker:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-atl-pacemaker
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-ipv-neg:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-ipv-neg
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-ipv-nextrop-neg:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-ipv-NexTrop-neg
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-ipv-nextrop-pos:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-ipv-NexTrop-pos
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-ipv-pos:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-ipv-pos
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-pac-control:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-pac-control
+    archive:
+      enabled: false
+  cmip6-dcpp-ipsl-cm6a-lr-dcppc-pac-pacemaker:
+    project: CMIP6
+    activity: DCPP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DCPP/IPSL/IPSL-CM6A-LR/dcppC-pac-pacemaker
+    archive:
+      enabled: false
+
+# GeoMIP
+
+  cmip6-geomip-ipsl-cm6a-lr-g1:
+    project: CMIP6
+    activity: GeoMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/GeoMIP/IPSL/IPSL-CM6A-LR/G1
+    archive:
+      enabled: false
+  cmip6-geomip-ipsl-cm6a-lr-g6solar:
+    project: CMIP6
+    activity: GeoMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/GeoMIP/IPSL/IPSL-CM6A-LR/G6solar
+    archive:
+      enabled: false
+  cmip6-geomip-ipsl-cm6a-lr-g6sulfur:
+    project: CMIP6
+    activity: GeoMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/GeoMIP/IPSL/IPSL-CM6A-LR/G6sulfur
+    archive:
+      enabled: false
+  cmip6-geomip-ipsl-cm6a-lr-g7cirrus:
+    project: CMIP6
+    activity: GeoMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/GeoMIP/IPSL/IPSL-CM6A-LR/G7cirrus
+    archive:
+      enabled: false
+
+# AerCheMIP
+  cmip6-aerchemip-ipsl-cm5a2-inca-ssp370-lowntcf:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM5A2-INCA/ssp370-lowNTCF
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm5a2-inca-ssp370-lowntcfch4:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM5A2-INCA/ssp370-lowNTCFCH4
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-atm-lr-reprobus-histsst-pintcf:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-ATM-LR-REPROBUS/histSST-piNTCF
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-lr-hist-piaer:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-LR/hist-piAer
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-lr-inca-piclim-2xdust:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-2xdust
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-lr-inca-piclim-2xss:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-2xss
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-lr-inca-piclim-bc:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-BC
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-lr-inca-piclim-nh3:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-NH3
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-lr-inca-piclim-oc:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-OC
+    archive:
+      enabled: false
+  cmip6-aerchemip-ipsl-cm6a-lr-inca-piclim-so2:
+    project: CMIP6
+    activity: AerChemMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/AerChemMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-SO2
+    archive:
+      enabled: false
+
+# C4MIP
+  cmip6-c4mip-ipsl-cm6a-lr-1pctco2-bgc:
+    project: CMIP6
+    activity: C4MIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/C4MIP/IPSL/IPSL-CM6A-LR/1pctCO2-bgc
+    archive:
+      enabled: false
+  cmip6-c4mip-ipsl-cm6a-lr-1pctco2-rad:
+    project: CMIP6
+    activity: C4MIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/C4MIP/IPSL/IPSL-CM6A-LR/1pctCO2-rad
+    archive:
+      enabled: false
+  cmip6-c4mip-ipsl-cm6a-lr-hist-bgc:
+    project: CMIP6
+    activity: C4MIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/C4MIP/IPSL/IPSL-CM6A-LR/hist-bgc
+    archive:
+      enabled: false
+
+# CFMIP
+  cmip6-cfmip-ipsl-cm6a-lr-a4sst:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/a4SST
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-a4sstice:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/a4SSTice
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-a4sstice-4xco2:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/a4SSTice-4xCO2
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-abrupt-0p5xco2:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/abrupt-0p5xCO2
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-abrupt-2xco2:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/abrupt-2xCO2
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-abrupt-solm4p:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/abrupt-solm4p
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-abrupt-solp4p:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/abrupt-solp4p
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-4xco2:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-4xCO2
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-a4sst-4xco2:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-a4SST-4xCO2
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-future4k:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-future4K
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-lwoff:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-lwoff
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-m4k:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-m4K
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-p4k:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-p4K
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-p4k-lwoff:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-p4K-lwoff
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-piforcing:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-piForcing
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-amip-piforcing-ext:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/amip-piForcing-EXT
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-aqua-4xco2:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/aqua-4xCO2
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-aqua-control:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/aqua-control
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-aqua-control-lwoff:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/aqua-control-lwoff
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-aqua-p4k:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/aqua-p4K
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-aqua-p4k-lwoff:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/aqua-p4K-lwoff
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-pisst:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/piSST
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-pisst-4xco2:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/piSST-4xCO2
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-pisst-4xco2-rad:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/piSST-4xCO2-rad
+    archive:
+      enabled: false
+  cmip6-cfmip-ipsl-cm6a-lr-pisst-pxk:
+    project: CMIP6
+    activity: CFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/CFMIP/IPSL/IPSL-CM6A-LR/piSST-pxK
+    archive:
+      enabled: false
+
+# DAMIP
+  cmip6-damip-ipsl-cm6a-lr-hist-aer:
+    project: CMIP6
+    activity: DAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DAMIP/IPSL/IPSL-CM6A-LR/hist-aer
+    archive:
+      enabled: false
+  cmip6-damip-ipsl-cm6a-lr-hist-ghg:
+    project: CMIP6
+    activity: DAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DAMIP/IPSL/IPSL-CM6A-LR/hist-GHG
+    archive:
+      enabled: false
+  cmip6-damip-ipsl-cm6a-lr-hist-nat:
+    project: CMIP6
+    activity: DAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DAMIP/IPSL/IPSL-CM6A-LR/hist-nat
+    archive:
+      enabled: false
+  cmip6-damip-ipsl-cm6a-lr-hist-strato3:
+    project: CMIP6
+    activity: DAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DAMIP/IPSL/IPSL-CM6A-LR/hist-stratO3
+    archive:
+      enabled: false
+  cmip6-damip-ipsl-cm6a-lr-ssp245-ghg:
+    project: CMIP6
+    activity: DAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DAMIP/IPSL/IPSL-CM6A-LR/ssp245-GHG
+    archive:
+      enabled: false
+  cmip6-damip-ipsl-cm6a-lr-ssp245-nat:
+    project: CMIP6
+    activity: DAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/DAMIP/IPSL/IPSL-CM6A-LR/ssp245-nat
+    archive:
+      enabled: false
+
+# GMMIP
+  cmip6-gmmip-ipsl-cm6a-lr-amip-hist:
+    project: CMIP6
+    activity: GMMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/GMMIP/IPSL/IPSL-CM6A-LR/amip-hist
+    archive:
+      enabled: false
+  cmip6-gmmip-ipsl-cm6a-lr-amip-hist-ext:
+    project: CMIP6
+    activity: GMMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/GMMIP/IPSL/IPSL-CM6A-LR/amip-hist-EXT
+    archive:
+      enabled: false
+  cmip6-gmmip-ipsl-cm6a-lr-amip-tip:
+    project: CMIP6
+    activity: GMMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/GMMIP/IPSL/IPSL-CM6A-LR/amip-TIP
+    archive:
+      enabled: false
+
+# HIGHRESMIP
+  cmip6-highresmip-ipsl-cm6a-atm-hr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM6A-ATM-HR/highresSST-present
+    archive:
+      enabled: false
+  cmip6-highresmip-ipsl-cm6a-atm-ico-hr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM6A-ATM-ICO-HR/highresSST-present
+    archive:
+      enabled: false
+  cmip6-highresmip-ipsl-cm6a-atm-ico-lr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM6A-ATM-ICO-LR/highresSST-present
+    archive:
+      enabled: false
+  cmip6-highresmip-ipsl-cm6a-atm-ico-mr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM6A-ATM-ICO-MR/highresSST-present
+    archive:
+      enabled: false
+  cmip6-highresmip-ipsl-cm6a-atm-ico-vhr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM6A-ATM-ICO-VHR/highresSST-present
+    archive:
+      enabled: false
+  cmip6-highresmip-ipsl-cm6a-lr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM6A-LR/highresSST-present
+    archive:
+      enabled: false
+  cmip6-highresmip-ipsl-cm7a-atm-hr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM7A-ATM-HR/highresSST-present
+    archive:
+      enabled: false
+  cmip6-highresmip-ipsl-cm7a-atm-lr-highressst-present:
+    project: CMIP6
+    activity: HighResMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/HighResMIP/IPSL/IPSL-CM7A-ATM-LR/highresSST-present
+    archive:
+      enabled: false
+
+# LS3MIP
+  cmip6-ls3mip-ipsl-cm6a-lr-amip-lfmip-pdlc:
+    project: CMIP6
+    activity: LS3MIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LS3MIP/IPSL/IPSL-CM6A-LR/amip-lfmip-pdLC
+    archive:
+      enabled: false
+  cmip6-ls3mip-ipsl-cm6a-lr-amip-lfmip-rmlc:
+    project: CMIP6
+    activity: LS3MIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LS3MIP/IPSL/IPSL-CM6A-LR/amip-lfmip-rmLC
+    archive:
+      enabled: false
+  cmip6-ls3mip-ipsl-cm6a-lr-land-hist:
+    project: CMIP6
+    activity: LS3MIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LS3MIP/IPSL/IPSL-CM6A-LR/land-hist
+    archive:
+      enabled: false
+  cmip6-ls3mip-ipsl-cm6a-lr-land-hist-cruncep:
+    project: CMIP6
+    activity: LS3MIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LS3MIP/IPSL/IPSL-CM6A-LR/land-hist-cruNcep
+    archive:
+      enabled: false
+
+# LUMIP
+  cmip6-lumip-ipsl-cm5a2-inca-ssp370-ssp126lu:
+    project: CMIP6
+    activity: LUMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LUMIP/IPSL/IPSL-CM5A2-INCA/ssp370-ssp126Lu
+    archive:
+      enabled: false
+  cmip6-lumip-ipsl-cm6a-lr-deforest-globe:
+    project: CMIP6
+    activity: LUMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LUMIP/IPSL/IPSL-CM6A-LR/deforest-globe
+    archive:
+      enabled: false
+  cmip6-lumip-ipsl-cm6a-lr-hist-nolu:
+    project: CMIP6
+    activity: LUMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LUMIP/IPSL/IPSL-CM6A-LR/hist-noLu
+    archive:
+      enabled: false
+  cmip6-lumip-ipsl-cm6a-lr-land-cco2:
+    project: CMIP6
+    activity: LUMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LUMIP/IPSL/IPSL-CM6A-LR/land-cCO2
+    archive:
+      enabled: false
+  cmip6-lumip-ipsl-cm6a-lr-land-nolu:
+    project: CMIP6
+    activity: LUMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LUMIP/IPSL/IPSL-CM6A-LR/land-noLu
+    archive:
+      enabled: false
+  cmip6-lumip-ipsl-cm6a-lr-ssp126-ssp370lu:
+    project: CMIP6
+    activity: LUMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LUMIP/IPSL/IPSL-CM6A-LR/ssp126-ssp370Lu
+    archive:
+      enabled: false
+  cmip6-lumip-ipsl-cm6a-lr-ssp370-ssp126lu:
+    project: CMIP6
+    activity: LUMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/LUMIP/IPSL/IPSL-CM6A-LR/ssp370-ssp126Lu
+    archive:
+      enabled: false
+
+# OMIP
+  cmip6-omip-ipsl-cm6a-lr-omip1:
+    project: CMIP6
+    activity: OMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/OMIP/IPSL/IPSL-CM6A-LR/omip1
+    archive:
+      enabled: false
+
+# PAMIP
+  cmip6-pamip-ipsl-cm6a-lr-futsst-pdsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/futSST-pdSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pa-futarcsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pa-futArcSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pa-futarcsic-ext:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pa-futArcSIC-ext
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pa-pdsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pa-pdSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pa-pdsic-ext:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pa-pdSIC-ext
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pa-piarcsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pa-piArcSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pdsst-futantsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pdSST-futAntSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pdsst-futarcsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pdSST-futArcSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pdsst-futbkseassic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pdSST-futBKSeasSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pdsst-futokhotsksic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pdSST-futOkhotskSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pdsst-pdsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pdSST-pdSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pdsst-piantsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pdSST-piAntSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pdsst-piarcsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/pdSST-piArcSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pisst-pdsic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/piSST-pdSIC
+    archive:
+      enabled: false
+  cmip6-pamip-ipsl-cm6a-lr-pisst-pisic:
+    project: CMIP6
+    activity: PAMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PAMIP/IPSL/IPSL-CM6A-LR/piSST-piSIC
+    archive:
+      enabled: false
+
+# PMIP
+
+  cmip6-pmip-ipsl-cm6a-lr-lig127k:
+    project: CMIP6
+    activity: PMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PMIP/IPSL/IPSL-CM6A-LR/lig127k
+    archive:
+      enabled: false
+  cmip6-pmip-ipsl-cm6a-lr-midholocene:
+    project: CMIP6
+    activity: PMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PMIP/IPSL/IPSL-CM6A-LR/midHolocene
+    archive:
+      enabled: false
+  cmip6-pmip-ipsl-cm6a-lr-midpliocene-eoi400:
+    project: CMIP6
+    activity: PMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/PMIP/IPSL/IPSL-CM6A-LR/midPliocene-eoi400
+    archive:
+      enabled: false
+
+#RFMIP
+
+  cmip6-rfmip-ipsl-4aop-v1-5-rad-irf:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/4AOP-v1-5/rad-irf
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-hist-spaer-all:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/hist-spAer-all
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-4xco2:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-4xCO2
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-aer:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-aer
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-anthro:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-anthro
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-control:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-control
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-ghg:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-ghg
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-histaer:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-histaer
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-histall:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-histall
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-histghg:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-histghg
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-histnat:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-histnat
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-lu:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-lu
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-spaer-aer:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-spAer-aer
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-spaer-anthro:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-spAer-anthro
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-piclim-spaer-histall:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR/piClim-spAer-histall
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-inca-piclim-aer:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-aer
+    archive:
+      enabled: false
+  cmip6-rfmip-ipsl-cm6a-lr-inca-piclim-control:
+    project: CMIP6
+    activity: RFMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/RFMIP/IPSL/IPSL-CM6A-LR-INCA/piClim-control
+    archive:
+      enabled: false
+
+# ScenarioMIP
+  # IPSL-CM5A2-INCA
+  cmip6-scenariomip-ipsl-cm5a2-inca-ssp126:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM5A2-INCA/ssp126
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm5a2-inca-ssp370:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM5A2-INCA/ssp370
+    archive:
+      enabled: false
+  # IPSL-CM6A-LR
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp119:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp119
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp126:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp126
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp245:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp245
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp370:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp370
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp434:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp434
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp460:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp460
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp534-over:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp534-over
+    archive:
+      enabled: false
+  cmip6-scenariomip-ipsl-cm6a-lr-ssp585:
+    project: CMIP6
+    activity: ScenarioMIP
+    institution: IPSL
+    mapfile_root: /mnt/tgcc/CMIP6/.mapfiles/ScenarioMIP/IPSL/IPSL-CM6A-LR/ssp585
     archive:
       enabled: false

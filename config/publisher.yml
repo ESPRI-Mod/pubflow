@@ -13,3 +13,15 @@ publisher:
   mapfile_path_mappings:
     - from: /ccc/work/cont003/cmip6/cmip6
       to: /mnt/tgcc/
+  esg:
+    config:
+      active: EAST-int
+      profiles:
+        EAST-int:
+          path: /home/esguser/.esg/esg.yaml.EASTINT
+        WEST-int:
+          path: /home/esguser/.esg/esg.yaml.WESTINT
+        EAST-prod:
+          path: /home/esguser/.esg/esg.yaml.EAST
+        WEST-prod:
+          path: /home/esguser/.esg/esg.yaml.WEST

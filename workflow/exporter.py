@@ -263,6 +263,9 @@ def sync_campaigns_to_grist(
     for row in rows:
         fields = {
             "campaign": row["campaign"],
+            "project": row["project"],
+            "activity": row["activity"],
+            "institution": row["institution"],
             "total": row["total"],
             "published": row["published"],
             "failed": row["failed"],
@@ -468,47 +471,55 @@ def sync_failures_to_grist(
 
 def get_campaign_records():
     conn = connect()
-
     rows = conn.execute(
         """
-        SELECT campaign,
+        SELECT d.campaign,
+               c.project,
+               c.activity,
+               c.institution,
                COUNT(*) AS total,
                SUM(
                        CASE
-                           WHEN publication_status = 'SUCCESS'
+                           WHEN d.publication_status = 'SUCCESS'
                                THEN 1
                            ELSE 0
                            END
                )        AS published,
                SUM(
                        CASE
-                           WHEN publication_status = 'FAILED'
+                           WHEN d.publication_status = 'FAILED'
                                THEN 1
                            ELSE 0
                            END
                )        AS failed,
                SUM(
                        CASE
-                           WHEN publication_status = 'PENDING'
+                           WHEN d.publication_status = 'PENDING'
                                THEN 1
                            ELSE 0
                            END
                )        AS pending
-        FROM datasets
-        GROUP BY campaign
-        ORDER BY campaign
+        FROM datasets d
+                 JOIN campaigns c
+                      ON d.campaign = c.name
+        GROUP BY d.campaign,
+                 c.project,
+                 c.activity,
+                 c.institution
+        ORDER BY d.campaign
         """
     ).fetchall()
-
     conn.close()
-
     return [
         {
             "campaign": row[0],
-            "total": row[1],
-            "published": row[2],
-            "failed": row[3],
-            "pending": row[4],
+            "project": row[1],
+            "activity": row[2],
+            "institution": row[3],
+            "total": row[4],
+            "published": row[5],
+            "failed": row[6],
+            "pending": row[7],
         }
         for row in rows
     ]
@@ -595,17 +606,9 @@ def sync_to_grist():
     dataset_rows = get_dataset_records()
     failure_rows = get_failure_records()
 
-    sync_campaigns_to_grist(
-        campaign_rows
-    )
-
-    sync_datasets_to_grist(
-        dataset_rows
-    )
-
-    sync_failures_to_grist(
-        failure_rows
-    )
+    sync_campaigns_to_grist(campaign_rows)
+    sync_datasets_to_grist(dataset_rows)
+    sync_failures_to_grist(failure_rows)
 
     return {
         "campaigns": len(campaign_rows),
