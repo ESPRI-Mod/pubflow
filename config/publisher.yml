@@ -15,7 +15,7 @@ publisher:
       to: /mnt/tgcc/
   esg:
     config:
-      active: EAST-int
+      active: EAST-prod
       profiles:
         EAST-int:
           path: /home/esguser/.esg/esg.yaml.EASTINT

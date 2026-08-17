@@ -3,7 +3,7 @@ import csv
 from workflow.database import connect
 from workflow.grist import add_records_batched, get_records, update_records_batched
 
-GRIST_BATCH_SIZE = 100
+GRIST_BATCH_SIZE = 500
 
 def get_campaign_status_rows():
     conn = connect()
