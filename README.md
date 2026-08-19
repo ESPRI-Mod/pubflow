@@ -474,19 +474,23 @@ pubflow publish tipmip-cnrm --limit 10
 
 ```
 
-Publication is performed in batches. The batch size is configured in `publisher.yml`:
+Publication is performed in batches, with one `esgpublish` directory invocation
+per batch:
 
-```yaml
+```bash
 
-publisher:
-
-  batch:
-
-    size: 50
+pubflow publish tipmip-cnrm --batch-size 50
 
 ```
 
-The executor tracks each publication attempt and updates the corresponding dataset state in DuckDB.
+The default batch size is 50. Set `--batch-size 1` to retain the previous
+one-invocation-per-dataset behavior.
+
+`PUB_STATUS=PASS` and `PUB_STATUS=FAIL` messages are recorded per dataset. If
+the publisher stops at the first failure, mapfiles it did not reach remain
+`PENDING` and are selected for the next batch. The executor tracks each
+reported publication attempt and updates the corresponding dataset state in
+DuckDB.
 
 ### Retries
 
@@ -1205,4 +1209,3 @@ python bin/archive.py archive_tasks.csv \
 
 For long-running publication campaigns, running Pubflow inside a persistent terminal session such as `tmux` is
 recommended.
-

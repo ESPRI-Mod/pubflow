@@ -5,7 +5,7 @@ import yaml
 from workflow.database import connect
 
 CAMPAIGNS_FILE = (
-    "/home/esguser/esgf-publisher-workflow/config/campaigns.yml"
+    "config/campaigns.yml"
 )
 
 

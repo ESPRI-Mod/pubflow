@@ -15,10 +15,10 @@ publisher:
       to: /mnt/tgcc/
   esg:
     config:
-      active: EAST-prod
+      active: EAST-int
       profiles:
         EAST-int:
-          path: /home/esguser/.esg/esg.yaml.EASTINT
+          path: /Users/atefbennasser/Documents/Codex/2026-08-18/https-github-com-espri-mod-pubflow/work/pubflow/tests/.esg/esg.yaml.EASTINT
         WEST-int:
           path: /home/esguser/.esg/esg.yaml.WESTINT
         EAST-prod:

@@ -2,7 +2,7 @@ from pathlib import Path
 import duckdb
 
 DB_PATH = Path(
-    "/home/esguser/esgf-publisher-workflow/db/publications.duckdb"
+    "db/publications.duckdb"
 )
 
 
