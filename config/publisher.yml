@@ -7,7 +7,7 @@ publisher:
   execution:
     dry_run: false
   logging:
-    directory: /home/esguser/esgf-publisher-workflow/logs
+    directory: logs
   retry:
     enabled: true
     max_attempts: 3
@@ -16,13 +16,13 @@ publisher:
       to: /mnt/tgcc/
   esg:
     config:
-      active: EAST-prod
+      active: EAST-int
       profiles:
         EAST-int:
-          path: /home/esguser/.esg/esg.yaml.EASTINT
+          path: ~/.esg/esg.yaml.EASTINT
         WEST-int:
-          path: /home/esguser/.esg/esg.yaml.WESTINT
+          path: ~/.esg/esg.yaml.WESTINT
         EAST-prod:
-          path: /home/esguser/.esg/esg.yaml.EAST
+          path: ~/.esg/esg.yaml.EAST
         WEST-prod:
-          path: /home/esguser/.esg/esg.yaml.WEST
+          path: ~/.esg/esg.yaml.WEST

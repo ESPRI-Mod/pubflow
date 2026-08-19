@@ -8,6 +8,7 @@ from workflow.config import get_publisher_config, get_active_esg_config
 from workflow.database import connect, update_dataset_status, retry_failed_datasets
 from workflow.result import PublicationResult
 from workflow.summary import PublicationSummary
+from workflow.publisher_output import parse_publication_statuses
 
 
 def create_run_id(campaign):
@@ -186,11 +187,36 @@ def finish_attempt(
     )
 
 
+def record_publication_result(
+        conn,
+        dataset_id,
+        run_id,
+        status,
+        exit_code,
+        log_file,
+        error_message=None,
+):
+    create_attempt(conn, dataset_id, run_id)
+    update_dataset_status(conn, dataset_id, status)
+    finish_attempt(
+        conn,
+        dataset_id,
+        run_id,
+        status,
+        exit_code,
+        str(log_file),
+        error_message,
+    )
+
+
 def dry_run_campaign(
         campaign,
         limit=None,
         batch_size=50,
 ):
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than zero")
+
     datasets = get_campaign_datasets(campaign, limit=limit)
     total = len(datasets)
     print()
@@ -213,13 +239,13 @@ def dry_run_campaign(
         batch_number = (batch_start // batch_size) + 1
         print(f"=== Batch {batch_number} "
             f"({len(batch)} datasets) ===")
-        for dataset_id, mapfile, status in batch:
-            print(f"[DRY-RUN] {dataset_id}")
-            print(f"  status : {status}")
-            print(f"  source mapfile: {mapfile}")
-            with tempfile.TemporaryDirectory(
-                    prefix="pubflow-dry-run-"
-            ) as temp_dir:
+        with tempfile.TemporaryDirectory(
+                prefix="pubflow-dry-run-"
+        ) as temp_dir:
+            for dataset_id, mapfile, status in batch:
+                print(f"[DRY-RUN] {dataset_id}")
+                print(f"  status : {status}")
+                print(f"  source mapfile: {mapfile}")
                 effective_mapfile = (
                         Path(temp_dir)
                         / Path(mapfile).name
@@ -273,43 +299,64 @@ def dry_run_campaign(
                                 f"      -> {rewritten_path}"
                             )
                             break
-                command = build_publish_command(
-                    effective_mapfile
-                )
-                print(
-                    f"  command: {' '.join(command)}"
-                )
+            command = build_publish_command(temp_dir)
+            print(
+                f"  batch command: {' '.join(command)}"
+            )
         print()
 
 
-def publish_dataset(
-        dataset_id,
-        mapfile,
+def publish_batch(
+        datasets,
         run_id,
         log_file,
+        batch_number,
 ):
     conn = connect()
-    create_attempt(
-        conn,
-        dataset_id,
-        run_id,
-    )
-    conn.commit()
+    results = []
     try:
         with tempfile.TemporaryDirectory(
                 prefix="pubflow-"
         ) as temp_dir:
-            effective_mapfile = (
-                    Path(temp_dir)
-                    / Path(mapfile).name
-            )
-            rewrite_mapfile(
-                mapfile,
-                effective_mapfile,
-            )
-            command = build_publish_command(
-                effective_mapfile
-            )
+            staged_datasets = []
+            staged_names = set()
+
+            for dataset_id, mapfile, status in datasets:
+                effective_mapfile = Path(temp_dir) / Path(mapfile).name
+                try:
+                    if effective_mapfile.name in staged_names:
+                        raise ValueError(
+                            "Duplicate mapfile basename in batch: "
+                            f"{effective_mapfile.name}"
+                        )
+                    rewrite_mapfile(mapfile, effective_mapfile)
+                    staged_names.add(effective_mapfile.name)
+                    staged_datasets.append((dataset_id, mapfile, status))
+                except Exception as exc:
+                    error_message = f"{type(exc).__name__}: {exc}"
+                    record_publication_result(
+                        conn,
+                        dataset_id,
+                        run_id,
+                        "FAILED",
+                        -1,
+                        log_file,
+                        error_message,
+                    )
+                    results.append(PublicationResult(
+                        dataset_id=dataset_id,
+                        status="FAILED",
+                        exit_code=-1,
+                        log_file=str(log_file),
+                        error_message=error_message,
+                    ))
+
+            conn.commit()
+
+            if not staged_datasets:
+                return results
+
+            command = build_publish_command(temp_dir)
             with open(
                     log_file,
                     "a",
@@ -318,14 +365,12 @@ def publish_dataset(
                     "\n" + "-" * 70 + "\n"
                 )
                 log.write(
-                    f"Dataset: {dataset_id}\n"
+                    f"Batch: {batch_number}\n"
                 )
-                log.write(
-                    f"Original mapfile: {mapfile}\n"
-                )
-                log.write(
-                    f"Effective mapfile: {effective_mapfile}\n"
-                )
+                log.write(f"Datasets: {len(staged_datasets)}\n")
+                for dataset_id, mapfile, _ in staged_datasets:
+                    log.write(f"  {dataset_id}: {mapfile}\n")
+                log.write(f"Effective directory: {temp_dir}\n")
                 log.write(
                     f"Command: {' '.join(command)}\n"
                 )
@@ -339,68 +384,68 @@ def publish_dataset(
                     text=True,
                 )
                 log.write(result.stdout)
-        if result.returncode == 0:
-            status = "SUCCESS"
-            error_message = None
-        else:
-            status = "FAILED"
-            error_message = extract_error_message(
-                result.stdout
-            )
 
-            if error_message is None:
-                error_message = (
-                    f"esgpublish exited with code "
-                    f"{result.returncode}"
+            statuses, unknown_ids = parse_publication_statuses(
+                result.stdout,
+                staged_datasets,
+            )
+            error_message = extract_error_message(result.stdout)
+
+            if unknown_ids:
+                with open(log_file, "a") as log:
+                    for unknown_id in unknown_ids:
+                        log.write(
+                            f"WARNING: PUB_STATUS for unknown dataset: "
+                            f"{unknown_id}\n"
+                        )
+
+            for dataset_id, status in statuses.items():
+                dataset_error = error_message if status == "FAILED" else None
+                record_publication_result(
+                    conn,
+                    dataset_id,
+                    run_id,
+                    status,
+                    result.returncode,
+                    log_file,
+                    dataset_error,
                 )
-        update_dataset_status(
-            conn,
-            dataset_id,
-            status,
-        )
-        finish_attempt(
-            conn,
-            dataset_id,
-            run_id,
-            status,
-            result.returncode,
-            str(log_file),
-            error_message,
-        )
-        conn.commit()
-        return PublicationResult(
-            dataset_id=dataset_id,
-            status=status,
-            exit_code=result.returncode,
-            log_file=str(log_file),
-            error_message=error_message,
-        )
+                results.append(PublicationResult(
+                    dataset_id=dataset_id,
+                    status=status,
+                    exit_code=result.returncode,
+                    log_file=str(log_file),
+                    error_message=dataset_error,
+                ))
+
+            conn.commit()
+            return results
     except Exception as exc:
         error_message = (
             f"{type(exc).__name__}: {exc}"
         )
-        update_dataset_status(
-            conn,
-            dataset_id,
-            "FAILED",
-        )
-        finish_attempt(
-            conn,
-            dataset_id,
-            run_id,
-            "FAILED",
-            -1,
-            str(log_file),
-            error_message,
-        )
+        completed_ids = {item.dataset_id for item in results}
+        for dataset_id, _, _ in datasets:
+            if dataset_id in completed_ids:
+                continue
+            record_publication_result(
+                conn,
+                dataset_id,
+                run_id,
+                "FAILED",
+                -1,
+                log_file,
+                error_message,
+            )
+            results.append(PublicationResult(
+                dataset_id=dataset_id,
+                status="FAILED",
+                exit_code=-1,
+                log_file=str(log_file),
+                error_message=error_message,
+            ))
         conn.commit()
-        return PublicationResult(
-            dataset_id=dataset_id,
-            status="FAILED",
-            exit_code=-1,
-            log_file=str(log_file),
-            error_message=error_message,
-        )
+        return results
     finally:
         conn.close()
 
@@ -431,6 +476,9 @@ def publish_campaign(
         limit=None,
         batch_size=50,
 ):
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than zero")
+
     run_id = create_run_id(campaign)
 
     summary = PublicationSummary(
@@ -511,13 +559,20 @@ def publish_campaign(
         )
         print()
 
-        for dataset_id, mapfile, status in datasets:
-            result = publish_dataset(
-                dataset_id,
-                mapfile,
-                run_id,
-                log_file,
+        results = publish_batch(
+            datasets,
+            run_id,
+            log_file,
+            batch_number,
+        )
+
+        if not results:
+            raise RuntimeError(
+                "esgpublish returned no recognizable PUB_STATUS lines; "
+                "the pending datasets were left unchanged"
             )
+
+        for result in results:
             summary.add_result(result)
             processed_count += 1
             total_processed += 1
@@ -544,6 +599,13 @@ def publish_campaign(
                 )
 
                 failed_count += 1
+
+        unattempted_count = len(datasets) - len(results)
+        if unattempted_count:
+            print(
+                f"PENDING {unattempted_count} datasets not reached "
+                "by esgpublish; they will be included in the next batch"
+            )
 
         print()
         print(

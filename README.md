@@ -242,7 +242,7 @@ publisher:
 
   logging:
 
-    directory: /home/esguser/esgf-publisher-workflow/logs
+    directory: logs
 
   retry:
 
@@ -266,19 +266,19 @@ esg:
 
       EAST-int:
 
-        path: /home/esguser/.esg/esg.yaml.EASTINT
+        path: ~/.esg/esg.yaml.EASTINT
 
       WEST-int:
 
-        path: /home/esguser/.esg/esg.yaml.WESTINT
+        path: ~/.esg/esg.yaml.WESTINT
 
       EAST-prod:
 
-        path: /home/esguser/.esg/esg.yaml.EAST
+        path: ~/.esg/esg.yaml.EAST
 
       WEST-prod:
 
-        path: /home/esguser/.esg/esg.yaml.WEST
+        path: ~/.esg/esg.yaml.WEST
 
 ```
 
@@ -294,7 +294,7 @@ esgpublish \
 
     --no-xarray \
 
-    --config /home/esguser/.esg/esg.yaml.EASTINT \
+    --config ~/.esg/esg.yaml.EASTINT \
 
     --map <mapfile>
 
@@ -474,19 +474,23 @@ pubflow publish tipmip-cnrm --limit 10
 
 ```
 
-Publication is performed in batches. The batch size is configured in `publisher.yml`:
+Publication is performed in batches, with one `esgpublish` directory invocation
+per batch:
 
-```yaml
+```bash
 
-publisher:
-
-  batch:
-
-    size: 50
+pubflow publish tipmip-cnrm --batch-size 50
 
 ```
 
-The executor tracks each publication attempt and updates the corresponding dataset state in DuckDB.
+The default batch size is 50. Set `--batch-size 1` to retain the previous
+one-invocation-per-dataset behavior.
+
+`PUB_STATUS=PASS` and `PUB_STATUS=FAIL` messages are recorded per dataset. If
+the publisher stops at the first failure, mapfiles it did not reach remain
+`PENDING` and are selected for the next batch. The executor tracks each
+reported publication attempt and updates the corresponding dataset state in
+DuckDB.
 
 ### Retries
 
@@ -556,7 +560,7 @@ publisher:
 
   logging:
 
-    directory: /home/esguser/esgf-publisher-workflow/logs
+    directory: logs
 
 ```
 
@@ -992,6 +996,26 @@ esgf-publisher-workflow/
 
 External credentials and connection information are supplied via environment variables.
 
+### Pubflow paths
+
+Repository-owned paths are resolved from the installed project location, so
+commands do not depend on the current working directory. Deployments can
+override them when required:
+
+```bash
+
+export PUBFLOW_DB_PATH=/path/to/publications.duckdb
+
+export PUBFLOW_CONFIG_DIR=/path/to/config
+
+export PUBFLOW_CAMPAIGNS_FILE=/path/to/campaigns.yml
+
+```
+
+Relative logging and campaign mapfile paths are resolved from the project
+root. User-relative paths such as `~/.esg/esg.yaml.EASTINT` and environment
+variables in configured paths are expanded automatically.
+
 ### Grist
 
 ```bash
@@ -1205,4 +1229,3 @@ python bin/archive.py archive_tasks.csv \
 
 For long-running publication campaigns, running Pubflow inside a persistent terminal session such as `tmux` is
 recommended.
-

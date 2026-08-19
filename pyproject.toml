@@ -14,7 +14,7 @@ dependencies = [
     "typer",
     "requests",
     "tqdm",
-    "esgvoc"
+    "esgvoc",
 ]
 
 [project.scripts]

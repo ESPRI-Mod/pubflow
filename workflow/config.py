@@ -1,12 +1,21 @@
+import os
 from pathlib import Path
 
 import yaml
 
-CONFIG_DIR = Path(__file__).parent.parent / "config"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def get_config_dir():
+    configured = os.environ.get(
+        "PUBFLOW_CONFIG_DIR",
+        str(PROJECT_ROOT / "config"),
+    )
+    return Path(os.path.expandvars(configured)).expanduser().resolve()
 
 
 def load_yaml(filename):
-    path = CONFIG_DIR / filename
+    path = get_config_dir() / filename
     if not path.exists():
         raise FileNotFoundError(
             f"Configuration file not found: {path}"
@@ -18,7 +27,16 @@ def get_publisher_config():
     config = load_yaml(
         "publisher.yml"
     )
-    return config["publisher"]
+    publisher = config["publisher"]
+    logging = publisher.get("logging", {})
+    if "directory" in logging:
+        directory = Path(
+            os.path.expandvars(str(logging["directory"]))
+        ).expanduser()
+        if not directory.is_absolute():
+            directory = PROJECT_ROOT / directory
+        logging["directory"] = str(directory.resolve())
+    return publisher
 
 
 def get_active_esg_config():
@@ -32,9 +50,12 @@ def get_active_esg_config():
             f"Available profiles: "
             f"{', '.join(profiles)}"
         )
-    path = Path(
-        profiles[active]["path"]
-    ).expanduser()
+    path = Path(os.path.expandvars(
+        str(profiles[active]["path"])
+    )).expanduser()
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    path = path.resolve()
     if not path.is_file():
         raise FileNotFoundError(
             f"ESG config for profile '{active}' "

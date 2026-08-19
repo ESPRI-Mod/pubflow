@@ -1,4 +1,13 @@
 campaigns:
+  testage:
+    project: CMIP6
+    activity: CMIP
+    institution: IPSL
+    mapfile_root: tests/mapfiles
+    archive:
+      enabled: false
+
+
   tipmip-cnrm:
     project: CMIP6Plus
     activity: TIPMIP
