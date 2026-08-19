@@ -1,19 +1,34 @@
 #!/usr/bin/env python3
 
+import os
+from pathlib import Path
+
 import yaml
 
 from workflow.database import connect
 
-CAMPAIGNS_FILE = (
-    "config/campaigns.yml"
-)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def get_campaigns_file():
+    configured = os.environ.get(
+        "PUBFLOW_CAMPAIGNS_FILE",
+        str(PROJECT_ROOT / "config" / "campaigns.yml"),
+    )
+    return Path(os.path.expandvars(configured)).expanduser().resolve()
 
 
 def load_campaigns():
-    with open(CAMPAIGNS_FILE) as f:
+    with open(get_campaigns_file()) as f:
         config = yaml.safe_load(f)
     conn = connect()
     for name, campaign in config["campaigns"].items():
+        mapfile_root = Path(os.path.expandvars(
+            str(campaign["mapfile_root"])
+        )).expanduser()
+        if not mapfile_root.is_absolute():
+            mapfile_root = PROJECT_ROOT / mapfile_root
+        mapfile_root = mapfile_root.resolve()
         archive = campaign.get("archive", {})
         archive_root = None
         archive_depth = None
@@ -40,7 +55,7 @@ def load_campaigns():
                 campaign["project"],
                 campaign["activity"],
                 campaign["institution"],
-                campaign["mapfile_root"],
+                str(mapfile_root),
                 archive_root,
                 archive_depth
             ],

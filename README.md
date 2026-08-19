@@ -242,7 +242,7 @@ publisher:
 
   logging:
 
-    directory: /home/esguser/esgf-publisher-workflow/logs
+    directory: logs
 
   retry:
 
@@ -266,19 +266,19 @@ esg:
 
       EAST-int:
 
-        path: /home/esguser/.esg/esg.yaml.EASTINT
+        path: ~/.esg/esg.yaml.EASTINT
 
       WEST-int:
 
-        path: /home/esguser/.esg/esg.yaml.WESTINT
+        path: ~/.esg/esg.yaml.WESTINT
 
       EAST-prod:
 
-        path: /home/esguser/.esg/esg.yaml.EAST
+        path: ~/.esg/esg.yaml.EAST
 
       WEST-prod:
 
-        path: /home/esguser/.esg/esg.yaml.WEST
+        path: ~/.esg/esg.yaml.WEST
 
 ```
 
@@ -294,7 +294,7 @@ esgpublish \
 
     --no-xarray \
 
-    --config /home/esguser/.esg/esg.yaml.EASTINT \
+    --config ~/.esg/esg.yaml.EASTINT \
 
     --map <mapfile>
 
@@ -560,7 +560,7 @@ publisher:
 
   logging:
 
-    directory: /home/esguser/esgf-publisher-workflow/logs
+    directory: logs
 
 ```
 
@@ -995,6 +995,26 @@ esgf-publisher-workflow/
 ## Environment Variables
 
 External credentials and connection information are supplied via environment variables.
+
+### Pubflow paths
+
+Repository-owned paths are resolved from the installed project location, so
+commands do not depend on the current working directory. Deployments can
+override them when required:
+
+```bash
+
+export PUBFLOW_DB_PATH=/path/to/publications.duckdb
+
+export PUBFLOW_CONFIG_DIR=/path/to/config
+
+export PUBFLOW_CAMPAIGNS_FILE=/path/to/campaigns.yml
+
+```
+
+Relative logging and campaign mapfile paths are resolved from the project
+root. User-relative paths such as `~/.esg/esg.yaml.EASTINT` and environment
+variables in configured paths are expanded automatically.
 
 ### Grist
 

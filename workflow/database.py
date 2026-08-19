@@ -1,9 +1,19 @@
+import os
 from pathlib import Path
 import duckdb
 
-DB_PATH = Path(
-    "db/publications.duckdb"
-)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def get_database_path():
+    configured = os.environ.get(
+        "PUBFLOW_DB_PATH",
+        str(PROJECT_ROOT / "db" / "publications.duckdb"),
+    )
+    return Path(os.path.expandvars(configured)).expanduser().resolve()
+
+
+DB_PATH = get_database_path()
 
 
 def connect():
