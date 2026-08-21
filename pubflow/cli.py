@@ -8,6 +8,7 @@ from tqdm import tqdm
 from workflow.archive import generate_archive_tasks, import_archive_results
 from workflow.campaign import get_campaign, load_campaigns
 from workflow.database import connect
+from workflow.diagnostics import run_diagnostics
 from workflow.executor import dry_run_campaign, publish_campaign, retry_campaign
 from workflow.exporter import export_campaign_status, sync_to_grist
 from workflow.grist import check_connection, get_table_columns, list_tables
@@ -292,6 +293,55 @@ def retry(
     except Exception as exc:
         typer.echo(f"ERROR: {exc}", err=True,)
         raise typer.Exit(code=1)
+
+
+@app.command("run-diagnostics")
+def run_diagnostics_command(
+        campaign: str,
+        limit: int | None = typer.Option(None, "--limit", "-l"),
+        persist_stac_item: bool = typer.Option(
+            False,
+            "--persist-stac-item",
+            help=(
+                "Retain generated STAC JSON after diagnostics. "
+                "It is generated temporarily regardless."
+            ),
+        ),
+        sync_grist: bool = typer.Option(
+            True,
+            "--sync-grist/--no-sync-grist",
+            help="Synchronize results to the Grist Diagnostics table.",
+        ),
+):
+    """Re-run failed datasets individually and collect server diagnostics."""
+    typer.echo(
+        "Diagnostics performs real publication attempts. "
+        "Recovered datasets will be marked SUCCESS."
+    )
+    try:
+        result = run_diagnostics(
+            campaign,
+            limit=limit,
+            persist_stac_item=persist_stac_item,
+            sync_grist=sync_grist,
+        )
+    except Exception as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo("")
+    typer.echo("Diagnostic run complete")
+    typer.echo(f"  Selected:          {result['selected']}")
+    typer.echo(f"  Recovered:         {result['recovered']}")
+    typer.echo(f"  Diagnosed:         {result['diagnosed']}")
+    typer.echo(f"  Unclassified:      {result['unclassified']}")
+    typer.echo(f"  Execution errors:  {result['execution_errors']}")
+    typer.echo(f"  Output:            {result['output_directory']}")
+    typer.echo(f"  CSV:               {result['csv_file']}")
+    if result["grist_synced"]:
+        typer.echo("  Grist:             synchronized")
+    elif result["grist_error"]:
+        typer.echo(f"  Grist warning:     {result['grist_error']}")
 
 @app.command()
 def version():

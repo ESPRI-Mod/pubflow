@@ -46,3 +46,25 @@ CREATE TABLE IF NOT EXISTS publication_attempts
     log_file VARCHAR,
     error_message VARCHAR
 );
+
+CREATE TABLE IF NOT EXISTS diagnostic_attempts
+(
+    diagnostic_id VARCHAR PRIMARY KEY,
+    diagnostic_run_id VARCHAR NOT NULL,
+    dataset_id VARCHAR NOT NULL,
+    campaign VARCHAR NOT NULL,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    outcome VARCHAR NOT NULL,
+    publisher_status VARCHAR,
+    exit_code INTEGER,
+    http_status INTEGER,
+    error_type VARCHAR,
+    schema_url VARCHAR,
+    rejected_value VARCHAR,
+    suggested_value VARCHAR,
+    summary VARCHAR,
+    server_instance VARCHAR,
+    log_file VARCHAR,
+    stac_file VARCHAR
+);
