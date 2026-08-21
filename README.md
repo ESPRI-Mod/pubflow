@@ -128,6 +128,8 @@ pubflow --help
 
 | `pubflow publish` | Publish datasets |
 
+| `pubflow run-diagnostics` | Re-run failed datasets individually and capture server diagnostics |
+
 | `pubflow validate` | Validate registered datasets |
 
 | `pubflow export` | Export database state to CSV |
@@ -568,6 +570,60 @@ Publication failures are also persisted in DuckDB and exported to Grist.
 
 ---
 
+## Failure Diagnostics
+
+Run diagnostics after a publication campaign to retry its currently failed
+datasets one at a time and capture the detailed response returned by the
+transaction service:
+
+```bash
+
+pubflow run-diagnostics tipmip-cnrm
+
+```
+
+This is a real publication attempt, not a dry run. A dataset which now emits
+`PUB_STATUS=PASS` is recorded as `SUCCESS`; a dataset which still fails remains
+`FAILED`. If the publisher emits no recognizable status, Pubflow records an
+execution error without changing the dataset's publication status.
+
+Each run creates a directory below
+`logs/<campaign>/diagnostics/<diagnostic-run-id>/` containing one full publisher
+log per dataset and a concise `diagnostics.csv`. Results are also appended to
+the DuckDB `diagnostic_attempts` table. Existing publication records are not
+removed or replaced.
+
+Pubflow always invokes the publisher with both `--verbose` and `--save-stac`.
+The generated item is used from an isolated temporary directory and is deleted
+after the attempt by default. To retain a copy alongside the diagnostic logs:
+
+```bash
+
+pubflow run-diagnostics tipmip-cnrm --persist-stac-item
+
+```
+
+The installed EAST publisher must expose the transaction service response in
+verbose output for structured HTTP/STAC validation details to be extracted. It
+must also support saving STAC from its EGI transaction client. Without those
+publisher changes, the command still preserves the complete verbose log and
+classifies the failure as unclassified.
+
+Grist synchronization is enabled by default. Use `--no-sync-grist` to keep the
+run local, or create the `Diagnostics` table described below before enabling
+synchronization. A Grist failure is reported as a warning and does not discard
+the DuckDB, CSV, or log results.
+
+Useful limiting form for the first production run:
+
+```bash
+
+pubflow run-diagnostics tipmip-cnrm --limit 5 --no-sync-grist
+
+```
+
+---
+
 ## Validation
 
 Validate registered datasets without triggering publication:
@@ -606,7 +662,8 @@ pubflow grist sync
 
 ```
 
-The Grist document contains three main tables:
+The Grist document contains three main workflow tables and an optional
+diagnostics table:
 
 ```text
 
@@ -615,6 +672,8 @@ Campaigns
 Datasets
 
 Failures
+
+Diagnostics
 
 ```
 
@@ -701,6 +760,51 @@ PENDING
 | log_file | Associated log file |
 
 | error_message | Error information |
+
+### Diagnostics
+
+Create a Grist table with table ID `Diagnostics` and these columns before using
+the default diagnostic synchronization:
+
+| Field | Description |
+
+|---|---|
+
+| diagnostic_id | Unique diagnostic attempt identifier |
+
+| diagnostic_run_id | Identifier shared by one diagnostic run |
+
+| dataset_id | Dataset identifier |
+
+| campaign | Associated campaign |
+
+| started_at | Attempt start timestamp |
+
+| finished_at | Attempt finish timestamp |
+
+| outcome | `RECOVERED`, `DIAGNOSED`, `UNCLASSIFIED`, or `EXECUTION_ERROR` |
+
+| publisher_status | Recognized publisher status, when present |
+
+| exit_code | Publisher process exit code |
+
+| http_status | Transaction service HTTP status |
+
+| error_type | RFC problem type returned by the service |
+
+| schema_url | STAC schema implicated by validation |
+
+| rejected_value | Value rejected by schema validation |
+
+| suggested_value | Closest accepted enum value, when identifiable |
+
+| summary | Condensed diagnostic message |
+
+| server_instance | Server-side problem instance identifier |
+
+| log_file | Full local verbose log path |
+
+| stac_file | Retained local STAC JSON path, when requested and available |
 
 > **Note:** Grist credentials are supplied via **environment variables** and are not stored in the repository.
 
