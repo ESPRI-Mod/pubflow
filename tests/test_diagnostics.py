@@ -8,6 +8,7 @@ import duckdb
 
 import workflow.database as database
 from workflow.diagnostics import _diagnostic_command, _run_one
+from workflow.stac_validation import LocalValidationResult, ValidationIssue
 
 
 class DiagnosticExecutionTests(unittest.TestCase):
@@ -115,6 +116,62 @@ class DiagnosticExecutionTests(unittest.TestCase):
 
         self.assertIn("--verbose", command)
         self.assertIn("--save-stac", command)
+
+    def test_local_validation_explains_generic_server_failure(self):
+        output = (
+            "ERROR Failed to publish: Error 400: "
+            "{\"status_code\": 400, \"detail\": \"Invalid request\"}\n"
+            "INFO PUB_STATUS=FAIL "
+            "id=CMIP6.example.variable.v20180802|esgf.example\n"
+        )
+
+        def publisher_run(command, cwd, **kwargs):
+            stac_path = Path(cwd) / "CMIP6.example.variable.v20180802.json"
+            stac_path.write_text("{}")
+            return subprocess.CompletedProcess(command, 1, stdout=output)
+
+        validation = LocalValidationResult(
+            valid=False,
+            issues=[ValidationIssue(
+                schema_url="https://example.test/cmip6/v2.0.2/schema.json",
+                path="$.properties.cmip6:variable_id",
+                message="'bad' is not one of ['good']",
+                validator="enum",
+                rejected_value="bad",
+                suggested_value="good",
+            )],
+        )
+        dataset = (self.dataset_id, str(self.mapfile), "FAILED")
+        run_dir = self.root / "local-validation-logs"
+        run_dir.mkdir()
+        with (
+            patch(
+                "workflow.diagnostics.build_publish_command",
+                return_value=["esgpublish", "--map", str(self.mapfile)],
+            ),
+            patch(
+                "workflow.executor.get_mapfile_path_mappings",
+                return_value=[],
+            ),
+            patch("workflow.diagnostics.subprocess.run", side_effect=publisher_run),
+            patch(
+                "workflow.diagnostics.validate_stac_item_file",
+                return_value=validation,
+            ),
+        ):
+            row = _run_one(
+                dataset,
+                "test",
+                "diagnostics_local_validation",
+                run_dir,
+                persist_stac_item=False,
+            )
+
+        self.assertEqual(row["outcome"], "DIAGNOSED")
+        self.assertEqual(row["error_type"], "local-stac-validation")
+        self.assertEqual(row["rejected_value"], "bad")
+        self.assertEqual(row["suggested_value"], "good")
+        self.assertIn("Local STAC validation failed", row["summary"])
 
 
 if __name__ == "__main__":

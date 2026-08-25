@@ -594,8 +594,14 @@ the DuckDB `diagnostic_attempts` table. Existing publication records are not
 removed or replaced.
 
 Pubflow always invokes the publisher with both `--verbose` and `--save-stac`.
-The generated item is used from an isolated temporary directory and is deleted
-after the attempt by default. To retain a copy alongside the diagnostic logs:
+The generated item is validated locally for basic STAC structure, WGS84
+geometry, and every schema declared in `stac_extensions`. Schemas are fetched
+once and cached in memory for the diagnostic run. Field-level local validation
+errors take precedence over a generic EAST response and all errors are written
+to the dataset log.
+
+The item is used from an isolated temporary directory and is deleted after the
+attempt by default. To retain a copy alongside the diagnostic logs:
 
 ```bash
 
@@ -603,11 +609,10 @@ pubflow run-diagnostics tipmip-cnrm --persist-stac-item
 
 ```
 
-The installed EAST publisher must expose the transaction service response in
-verbose output for structured HTTP/STAC validation details to be extracted. It
-must also support saving STAC from its EGI transaction client. Without those
-publisher changes, the command still preserves the complete verbose log and
-classifies the failure as unclassified.
+The installed EAST publisher must support saving STAC from its EGI transaction
+client. Detailed transaction service output remains useful for authorization,
+conflict, and other server-only failures, but it is no longer required for
+field-level schema diagnostics.
 
 Grist synchronization is enabled by default. Use `--no-sync-grist` to keep the
 run local, or create the `Diagnostics` table described below before enabling

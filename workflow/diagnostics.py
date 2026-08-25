@@ -19,6 +19,10 @@ from workflow.publisher_output import (
     parse_publication_statuses,
     publisher_dataset_id,
 )
+from workflow.stac_validation import (
+    LocalValidationResult,
+    validate_stac_item_file,
+)
 
 
 DIAGNOSTICS_SCHEMA = """
@@ -103,14 +107,30 @@ def _safe_filename(dataset_id):
     return dataset_id.replace("/", "_").replace("#", ".v")
 
 
-def _copy_stac_file(temp_dir, dataset_id, destination_dir):
+def _generated_stac_file(temp_dir, dataset_id):
     expected = Path(temp_dir) / f"{publisher_dataset_id(dataset_id)}.json"
-    if not expected.is_file():
+    return expected if expected.is_file() else None
+
+
+def _copy_stac_file(source, destination_dir):
+    if source is None:
         return None
     destination_dir.mkdir(parents=True, exist_ok=True)
-    destination = destination_dir / expected.name
-    shutil.copy2(expected, destination)
+    destination = destination_dir / source.name
+    shutil.copy2(source, destination)
     return str(destination)
+
+
+def _write_local_validation(log_file, result):
+    with open(log_file, "a") as stream:
+        stream.write("\n--- local STAC validation ---\n")
+        stream.write(result.summary + "\n")
+        for issue in result.issues:
+            stream.write(
+                f"schema={issue.schema_url} "
+                f"validator={issue.validator or 'unknown'} "
+                f"{issue.concise()}\n"
+            )
 
 
 def _persist_diagnostic(conn, row):
@@ -151,6 +171,10 @@ def _run_one(dataset, campaign, run_id, run_dir, persist_stac_item):
     publisher_status = None
     exit_code = -1
     stac_file = None
+    local_validation = LocalValidationResult(
+        valid=None,
+        error="publisher did not generate a STAC item",
+    )
 
     try:
         with tempfile.TemporaryDirectory(prefix="pubflow-diagnostic-") as temp_dir:
@@ -171,16 +195,27 @@ def _run_one(dataset, campaign, run_id, run_dir, persist_stac_item):
             statuses, _ = parse_publication_statuses(output, [dataset])
             publisher_status = statuses.get(dataset_id)
             parsed = parse_server_diagnostic(output)
+            generated_stac = _generated_stac_file(temp_dir, dataset_id)
+            if generated_stac is not None:
+                local_validation = validate_stac_item_file(generated_stac)
+            _write_local_validation(log_file, local_validation)
             if persist_stac_item:
                 stac_file = _copy_stac_file(
-                    temp_dir,
-                    dataset_id,
+                    generated_stac,
                     run_dir / "stac",
                 )
 
         if publisher_status == "SUCCESS":
             outcome = "RECOVERED"
             summary = "Previously failed dataset published successfully."
+        elif publisher_status == "FAILED" and local_validation.valid is False:
+            outcome = "DIAGNOSED"
+            summary = local_validation.summary
+            issue = local_validation.first_issue
+            parsed.error_type = "local-stac-validation"
+            parsed.schema_url = issue.schema_url
+            parsed.rejected_value = issue.rejected_value
+            parsed.suggested_value = issue.suggested_value
         elif publisher_status == "FAILED" and parsed.http_status is not None:
             outcome = "DIAGNOSED"
             summary = parsed.summary
