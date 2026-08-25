@@ -130,6 +130,8 @@ pubflow --help
 
 | `pubflow run-diagnostics` | Re-run failed datasets individually and capture server diagnostics |
 
+| `pubflow cleanup-stac-items` | Preview or remove publisher-generated STAC JSON dumps |
+
 | `pubflow validate` | Validate registered datasets |
 
 | `pubflow export` | Export database state to CSV |
@@ -608,6 +610,32 @@ attempt by default. To retain a copy alongside the diagnostic logs:
 pubflow run-diagnostics tipmip-cnrm --persist-stac-item
 
 ```
+
+Older or manually generated STAC dumps can be cleaned without shell wildcard
+expansion. The command previews matches by default and verifies the JSON content
+and item ID before treating a file as a generated STAC Item:
+
+```bash
+
+pubflow cleanup-stac-items \
+    --directory /home/esguser/esgf-publisher-workflow \
+    --pattern 'CMIP6.ScenarioMIP.IPSL.IPSL-CM*.json'
+
+```
+
+After reviewing the preview, repeat with `--delete`:
+
+```bash
+
+pubflow cleanup-stac-items \
+    --directory /home/esguser/esgf-publisher-workflow \
+    --pattern 'CMIP6.ScenarioMIP.IPSL.IPSL-CM*.json' \
+    --delete
+
+```
+
+Cleanup is limited to the selected directory and does not recurse into
+subdirectories.
 
 The installed EAST publisher must support saving STAC from its EGI transaction
 client. Detailed transaction service output remains useful for authorization,

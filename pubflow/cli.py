@@ -13,6 +13,7 @@ from workflow.executor import dry_run_campaign, publish_campaign, retry_campaign
 from workflow.exporter import export_campaign_status, sync_to_grist
 from workflow.grist import check_connection, get_table_columns, list_tables
 from workflow.registry import register_dataset
+from workflow.stac_cleanup import cleanup_stac_items
 from workflow.validator import validate_campaign
 
 app = typer.Typer(
@@ -342,6 +343,49 @@ def run_diagnostics_command(
         typer.echo("  Grist:             synchronized")
     elif result["grist_error"]:
         typer.echo(f"  Grist warning:     {result['grist_error']}")
+
+
+@app.command("cleanup-stac-items")
+def cleanup_stac_items_command(
+        directory: Path = typer.Option(
+            Path("."),
+            "--directory",
+            "-d",
+            help="Directory containing dumped STAC JSON files.",
+        ),
+        pattern: str = typer.Option(
+            "CMIP*.json",
+            "--pattern",
+            help="Filename pattern within that directory only.",
+        ),
+        delete: bool = typer.Option(
+            False,
+            "--delete",
+            help="Delete recognized items; otherwise only preview them.",
+        ),
+):
+    """Preview or remove publisher-generated STAC Item dumps."""
+    try:
+        result = cleanup_stac_items(
+            directory=directory,
+            pattern=pattern,
+            delete=delete,
+        )
+    except (OSError, ValueError) as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    action = "Deleted" if delete else "Found"
+    typer.echo(f"Directory: {result['directory']}")
+    typer.echo(f"Pattern:   {result['pattern']}")
+    typer.echo(f"{action}:     {result['count']}")
+    for path in result["files"][:20]:
+        typer.echo(f"  {path}")
+    remaining = result["count"] - 20
+    if remaining > 0:
+        typer.echo(f"  ... and {remaining} more")
+    if not delete and result["count"]:
+        typer.echo("Preview only; repeat with --delete to remove these files.")
 
 @app.command()
 def version():
