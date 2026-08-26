@@ -17,8 +17,8 @@ from workflow.executor import (
 )
 from workflow.publisher_output import (
     parse_publication_statuses,
-    publisher_dataset_id,
 )
+from workflow.stac_items import generated_stac_path, reconcile_stac_item
 from workflow.stac_validation import (
     LocalValidationResult,
     validate_stac_item_file,
@@ -92,7 +92,7 @@ def get_failed_datasets(campaign, limit=None):
 
 
 def _diagnostic_command(mapfile):
-    command = build_publish_command(mapfile)
+    command = build_publish_command(mapfile, save_stac=True)
     map_index = command.index("--map")
     options = []
     if "--verbose" not in command:
@@ -105,11 +105,6 @@ def _diagnostic_command(mapfile):
 
 def _safe_filename(dataset_id):
     return dataset_id.replace("/", "_").replace("#", ".v")
-
-
-def _generated_stac_file(temp_dir, dataset_id):
-    expected = Path(temp_dir) / f"{publisher_dataset_id(dataset_id)}.json"
-    return expected if expected.is_file() else None
 
 
 def _copy_stac_file(source, destination_dir):
@@ -178,12 +173,17 @@ def _run_one(dataset, campaign, run_id, run_dir, persist_stac_item):
 
     try:
         with tempfile.TemporaryDirectory(prefix="pubflow-diagnostic-") as temp_dir:
-            effective_mapfile = Path(temp_dir) / Path(mapfile).name
+            temp_root = Path(temp_dir)
+            map_directory = temp_root / "mapfiles"
+            stac_staging_directory = temp_root / "stac-output"
+            map_directory.mkdir()
+            stac_staging_directory.mkdir()
+            effective_mapfile = map_directory / Path(mapfile).name
             rewrite_mapfile(mapfile, effective_mapfile)
             command = _diagnostic_command(effective_mapfile)
             completed = subprocess.run(
                 command,
-                cwd=temp_dir,
+                cwd=stac_staging_directory,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -195,15 +195,47 @@ def _run_one(dataset, campaign, run_id, run_dir, persist_stac_item):
             statuses, _ = parse_publication_statuses(output, [dataset])
             publisher_status = statuses.get(dataset_id)
             parsed = parse_server_diagnostic(output)
-            generated_stac = _generated_stac_file(temp_dir, dataset_id)
+            generated_stac = generated_stac_path(
+                stac_staging_directory,
+                dataset_id,
+            )
             if generated_stac is not None:
                 local_validation = validate_stac_item_file(generated_stac)
             _write_local_validation(log_file, local_validation)
             if persist_stac_item:
-                stac_file = _copy_stac_file(
-                    generated_stac,
-                    run_dir / "stac",
-                )
+                try:
+                    stac_file = _copy_stac_file(
+                        generated_stac,
+                        run_dir / "stac",
+                    )
+                except Exception as exc:
+                    with open(log_file, "a") as stream:
+                        stream.write(
+                            "WARNING: Could not persist per-run STAC item: "
+                            f"{type(exc).__name__}: {exc}\n"
+                        )
+            if publisher_status in ("SUCCESS", "FAILED"):
+                try:
+                    stac_action, retained_path = reconcile_stac_item(
+                        stac_staging_directory,
+                        dataset_id,
+                        publisher_status,
+                    )
+                    with open(log_file, "a") as stream:
+                        location = (
+                            f" at {retained_path}" if retained_path else ""
+                        )
+                        stream.write(
+                            f"Central STAC item: {stac_action}{location}\n"
+                        )
+                    if stac_file is None and retained_path is not None:
+                        stac_file = retained_path
+                except Exception as exc:
+                    with open(log_file, "a") as stream:
+                        stream.write(
+                            "WARNING: Could not reconcile central STAC item: "
+                            f"{type(exc).__name__}: {exc}\n"
+                        )
 
         if publisher_status == "SUCCESS":
             outcome = "RECOVERED"

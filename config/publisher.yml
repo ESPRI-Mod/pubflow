@@ -8,6 +8,8 @@ publisher:
     dry_run: false
   logging:
     directory: logs
+  stac_items:
+    directory: stac-items
   retry:
     enabled: true
     max_attempts: 3

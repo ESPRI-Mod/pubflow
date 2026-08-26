@@ -595,15 +595,30 @@ log per dataset and a concise `diagnostics.csv`. Results are also appended to
 the DuckDB `diagnostic_attempts` table. Existing publication records are not
 removed or replaced.
 
-Pubflow always invokes the publisher with both `--verbose` and `--save-stac`.
-The generated item is validated locally for basic STAC structure, WGS84
+Pubflow publication runs force temporary STAC generation with `--save-stac`.
+Diagnostics additionally enable `--verbose` and validate the generated item
+locally for basic STAC structure, WGS84
 geometry, and every schema declared in `stac_extensions`. Schemas are fetched
 once and cached in memory for the diagnostic run. Field-level local validation
 errors take precedence over a generic EAST response and all errors are written
 to the dataset log.
 
-The item is used from an isolated temporary directory and is deleted after the
-attempt by default. To retain a copy alongside the diagnostic logs:
+The publisher writes items into an isolated staging directory. Pubflow retains
+only items with an explicit `PUB_STATUS=FAIL` in `stac-items/`; successful and
+unreached items are discarded. If a previously failed dataset later succeeds,
+its stale retained item is removed. The destination can be changed in
+`config/publisher.yml`:
+
+```yaml
+
+publisher:
+  stac_items:
+    directory: stac-items
+
+```
+
+It can also be overridden with `PUBFLOW_STAC_ITEMS_DIR`. To retain an additional
+per-run copy alongside the diagnostic logs, including a recovered item:
 
 ```bash
 
@@ -837,7 +852,7 @@ the default diagnostic synchronization:
 
 | log_file | Full local verbose log path |
 
-| stac_file | Retained local STAC JSON path, when requested and available |
+| stac_file | Retained failed-item path, or requested per-run item path |
 
 > **Note:** Grist credentials are supplied via **environment variables** and are not stored in the repository.
 

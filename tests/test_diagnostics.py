@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 import unittest
@@ -44,9 +45,21 @@ class DiagnosticExecutionTests(unittest.TestCase):
         conn.close()
         self.original_database_path = database.DB_PATH
         database.DB_PATH = self.database_path
+        self.original_stac_items_directory = os.environ.get(
+            "PUBFLOW_STAC_ITEMS_DIR"
+        )
+        os.environ["PUBFLOW_STAC_ITEMS_DIR"] = str(
+            self.root / "stac-items"
+        )
 
     def tearDown(self):
         database.DB_PATH = self.original_database_path
+        if self.original_stac_items_directory is None:
+            os.environ.pop("PUBFLOW_STAC_ITEMS_DIR", None)
+        else:
+            os.environ["PUBFLOW_STAC_ITEMS_DIR"] = (
+                self.original_stac_items_directory
+            )
         self.temp_dir.cleanup()
 
     @property
@@ -100,6 +113,24 @@ class DiagnosticExecutionTests(unittest.TestCase):
 
         self.assertEqual(row["outcome"], "RECOVERED")
         self.assertEqual(self.dataset_status(), "SUCCESS")
+
+    def test_stac_storage_error_does_not_override_publisher_success(self):
+        with patch(
+            "workflow.diagnostics.reconcile_stac_item",
+            side_effect=PermissionError("read-only destination"),
+        ):
+            row = self.run_attempt(
+                "INFO PUB_STATUS=PASS "
+                "id=CMIP6.example.variable.v20180802|esgf.example\n",
+                0,
+            )
+
+        self.assertEqual(row["outcome"], "RECOVERED")
+        self.assertEqual(self.dataset_status(), "SUCCESS")
+        self.assertIn(
+            "Could not reconcile central STAC item",
+            Path(row["log_file"]).read_text(),
+        )
 
     def test_unrecognized_output_does_not_change_failed_status(self):
         row = self.run_attempt("publisher crashed before status\n", 1)

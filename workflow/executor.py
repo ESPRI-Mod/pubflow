@@ -9,6 +9,7 @@ from workflow.database import connect, update_dataset_status, retry_failed_datas
 from workflow.result import PublicationResult
 from workflow.summary import PublicationSummary
 from workflow.publisher_output import parse_publication_statuses
+from workflow.stac_items import reconcile_stac_item
 
 
 def create_run_id(campaign):
@@ -124,12 +125,14 @@ def rewrite_mapfile(
             )
 
 
-def build_publish_command(mapfile):
+def build_publish_command(mapfile, save_stac=False):
     publisher = get_publisher_config()
     command = [publisher["executable"]]
     command.extend(publisher.get("arguments", []))
     profile, esg_config = get_active_esg_config()
     command.extend(["--config", str(esg_config),])
+    if save_stac and "--save-stac" not in command:
+        command.append("--save-stac")
     command.extend(["--map", str(mapfile),])
     return command
 
@@ -299,7 +302,7 @@ def dry_run_campaign(
                                 f"      -> {rewritten_path}"
                             )
                             break
-            command = build_publish_command(temp_dir)
+            command = build_publish_command(temp_dir, save_stac=True)
             print(
                 f"  batch command: {' '.join(command)}"
             )
@@ -318,11 +321,16 @@ def publish_batch(
         with tempfile.TemporaryDirectory(
                 prefix="pubflow-"
         ) as temp_dir:
+            temp_root = Path(temp_dir)
+            map_directory = temp_root / "mapfiles"
+            stac_staging_directory = temp_root / "stac-output"
+            map_directory.mkdir()
+            stac_staging_directory.mkdir()
             staged_datasets = []
             staged_names = set()
 
             for dataset_id, mapfile, status in datasets:
-                effective_mapfile = Path(temp_dir) / Path(mapfile).name
+                effective_mapfile = map_directory / Path(mapfile).name
                 try:
                     if effective_mapfile.name in staged_names:
                         raise ValueError(
@@ -356,7 +364,10 @@ def publish_batch(
             if not staged_datasets:
                 return results
 
-            command = build_publish_command(temp_dir)
+            command = build_publish_command(
+                map_directory,
+                save_stac=True,
+            )
             with open(
                     log_file,
                     "a",
@@ -370,7 +381,8 @@ def publish_batch(
                 log.write(f"Datasets: {len(staged_datasets)}\n")
                 for dataset_id, mapfile, _ in staged_datasets:
                     log.write(f"  {dataset_id}: {mapfile}\n")
-                log.write(f"Effective directory: {temp_dir}\n")
+                log.write(f"Effective directory: {map_directory}\n")
+                log.write(f"STAC staging directory: {stac_staging_directory}\n")
                 log.write(
                     f"Command: {' '.join(command)}\n"
                 )
@@ -379,6 +391,7 @@ def publish_batch(
                 )
                 result = subprocess.run(
                     command,
+                    cwd=stac_staging_directory,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -400,6 +413,23 @@ def publish_batch(
                         )
 
             for dataset_id, status in statuses.items():
+                with open(log_file, "a") as log:
+                    try:
+                        stac_action, stac_path = reconcile_stac_item(
+                            stac_staging_directory,
+                            dataset_id,
+                            status,
+                        )
+                        location = f" at {stac_path}" if stac_path else ""
+                        log.write(
+                            f"STAC item {dataset_id}: "
+                            f"{stac_action}{location}\n"
+                        )
+                    except Exception as exc:
+                        log.write(
+                            f"WARNING: Could not reconcile STAC item "
+                            f"{dataset_id}: {type(exc).__name__}: {exc}\n"
+                        )
                 dataset_error = error_message if status == "FAILED" else None
                 record_publication_result(
                     conn,

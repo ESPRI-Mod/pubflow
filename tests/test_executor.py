@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 
+from workflow.executor import build_publish_command
 from workflow.publisher_output import (
     parse_publication_statuses,
     publisher_dataset_id,
@@ -51,6 +53,25 @@ INFO PUB_STATUS=FAIL id=CMIP6.example.variable.v20181022|esgf.ipsl.fr
             unknown,
             ["CMIP6.example.unknown.v20190101"],
         )
+
+    def test_publish_command_can_force_temporary_stac_generation(self):
+        with (
+            patch(
+                "workflow.executor.get_publisher_config",
+                return_value={"executable": "esgpublish", "arguments": []},
+            ),
+            patch(
+                "workflow.executor.get_active_esg_config",
+                return_value=("test", "/tmp/esg.yaml"),
+            ),
+        ):
+            command = build_publish_command(
+                "/tmp/mapfiles",
+                save_stac=True,
+            )
+
+        self.assertEqual(command.count("--save-stac"), 1)
+        self.assertEqual(command[-2:], ["--map", "/tmp/mapfiles"])
 
 
 if __name__ == "__main__":
