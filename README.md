@@ -496,6 +496,13 @@ the publisher stops at the first failure, mapfiles it did not reach remain
 reported publication attempt and updates the corresponding dataset state in
 DuckDB.
 
+If an entire batch returns no recognizable `PUB_STATUS`, Pubflow retries its
+first dataset alone. If the isolated retry is also status-less, the attempt is
+recorded as `NO_STATUS`, the dataset remains `PENDING`, and it is deferred for
+the remainder of the current run. Publication then continues with the other
+pending datasets. The run summary and log list every deferred dataset, along
+with the publisher exit code and output length.
+
 ### Retries
 
 Retries can be configured in `publisher.yml`:

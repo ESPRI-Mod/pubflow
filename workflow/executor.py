@@ -34,6 +34,7 @@ def get_run_log_file(campaign, run_id):
 def get_campaign_datasets(
         campaign,
         limit=None,
+        exclude_dataset_ids=None,
 ):
     conn = connect()
     query = """
@@ -43,10 +44,17 @@ def get_campaign_datasets(
             FROM datasets
             WHERE campaign = ?
               AND publication_status = 'PENDING'
-            ORDER BY dataset_id \
             """
 
     params = [campaign]
+
+    excluded = sorted(exclude_dataset_ids or [])
+    if excluded:
+        placeholders = ", ".join("?" for _ in excluded)
+        query += f" AND dataset_id NOT IN ({placeholders})"
+        params.extend(excluded)
+
+    query += " ORDER BY dataset_id"
 
     if limit is not None:
         query += " LIMIT ?"
@@ -212,6 +220,27 @@ def record_publication_result(
     )
 
 
+def record_no_status_attempt(
+        conn,
+        dataset_id,
+        run_id,
+        exit_code,
+        log_file,
+        error_message,
+):
+    """Record an ambiguous attempt without changing the PENDING dataset."""
+    create_attempt(conn, dataset_id, run_id)
+    finish_attempt(
+        conn,
+        dataset_id,
+        run_id,
+        "NO_STATUS",
+        exit_code,
+        str(log_file),
+        error_message,
+    )
+
+
 def dry_run_campaign(
         campaign,
         limit=None,
@@ -314,6 +343,7 @@ def publish_batch(
         run_id,
         log_file,
         batch_number,
+        record_missing_status=False,
 ):
     conn = connect()
     results = []
@@ -396,13 +426,16 @@ def publish_batch(
                     stderr=subprocess.STDOUT,
                     text=True,
                 )
-                log.write(result.stdout)
+                output = result.stdout or ""
+                log.write(output)
+                log.write(f"\nPublisher exit code: {result.returncode}\n")
+                log.write(f"Publisher output length: {len(output)}\n")
 
             statuses, unknown_ids = parse_publication_statuses(
-                result.stdout,
+                output,
                 staged_datasets,
             )
-            error_message = extract_error_message(result.stdout)
+            error_message = extract_error_message(output)
 
             if unknown_ids:
                 with open(log_file, "a") as log:
@@ -411,6 +444,33 @@ def publish_batch(
                             f"WARNING: PUB_STATUS for unknown dataset: "
                             f"{unknown_id}\n"
                         )
+
+            if (
+                not statuses
+                and not results
+                and record_missing_status
+                and len(staged_datasets) == 1
+            ):
+                dataset_id = staged_datasets[0][0]
+                no_status_error = error_message or (
+                    "esgpublish returned no recognizable PUB_STATUS line "
+                    f"(exit code {result.returncode}, "
+                    f"output length {len(output)})"
+                )
+                record_no_status_attempt(
+                    conn,
+                    dataset_id,
+                    run_id,
+                    result.returncode,
+                    log_file,
+                    no_status_error,
+                )
+                with open(log_file, "a") as log:
+                    log.write(
+                        f"DEFERRED {dataset_id}: {no_status_error}\n"
+                    )
+                conn.commit()
+                return []
 
             for dataset_id, status in statuses.items():
                 with open(log_file, "a") as log:
@@ -551,14 +611,16 @@ def publish_campaign(
         )
 
     total_processed = 0
+    total_considered = 0
     batch_number = 0
+    deferred_dataset_ids = set()
 
     while True:
         remaining = None
 
         if limit is not None:
             remaining = (
-                    limit - total_processed
+                    limit - total_considered
             )
 
             if remaining <= 0:
@@ -575,6 +637,7 @@ def publish_campaign(
         datasets = get_campaign_datasets(
             campaign,
             limit=current_batch_size,
+            exclude_dataset_ids=deferred_dataset_ids,
         )
 
         if not datasets:
@@ -597,15 +660,42 @@ def publish_campaign(
         )
 
         if not results:
-            raise RuntimeError(
-                "esgpublish returned no recognizable PUB_STATUS lines; "
-                "the pending datasets were left unchanged"
+            isolated_dataset = datasets[0]
+            print(
+                "No recognizable PUB_STATUS lines; retrying the first "
+                "dataset in isolation"
             )
+            with open(log_file, "a") as log:
+                log.write(
+                    "No recognizable PUB_STATUS lines for batch "
+                    f"{batch_number}; isolating {isolated_dataset[0]}\n"
+                )
+
+            results = publish_batch(
+                [isolated_dataset],
+                run_id,
+                log_file,
+                f"{batch_number}-isolation",
+                record_missing_status=True,
+            )
+
+            if not results:
+                dataset_id = isolated_dataset[0]
+                deferred_dataset_ids.add(dataset_id)
+                total_considered += 1
+                print(
+                    f"DEFERRED {dataset_id}: no recognizable PUB_STATUS; "
+                    "it remains PENDING and will be skipped for this run"
+                )
+                print()
+                print(f"Batch {batch_number} complete")
+                continue
 
         for result in results:
             summary.add_result(result)
             processed_count += 1
             total_processed += 1
+            total_considered += 1
 
             if result.status == "SUCCESS":
                 print(
@@ -672,6 +762,10 @@ def publish_campaign(
     print()
     print(f"Total datasets processed: "
         f"{total_processed}")
+    print(f"Datasets deferred: {len(deferred_dataset_ids)}")
+    if deferred_dataset_ids:
+        for dataset_id in sorted(deferred_dataset_ids):
+            print(f"  - {dataset_id} (remains PENDING)")
     with open(log_file, "a") as log:
         log.write("\n" + "=" * 70 + "\n")
         log.write("RUN COMPLETE\n")
@@ -682,6 +776,9 @@ def publish_campaign(
         log.write(f"Processed: {processed_count}\n")
         log.write(f"SUCCESS:   {success_count}\n")
         log.write(f"FAILED:    {failed_count}\n")
+        log.write(f"DEFERRED:  {len(deferred_dataset_ids)}\n")
+        for dataset_id in sorted(deferred_dataset_ids):
+            log.write(f"  {dataset_id}\n")
         log.write("=" * 70 + "\n")
 
     print("Triggering asynchronous Grist sync...")
