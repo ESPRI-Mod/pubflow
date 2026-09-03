@@ -124,23 +124,28 @@ pubflow --help
 
 |---|---|
 
-| `pubflow register` | Register datasets and files from mapfiles |
+| `pubflow dataset register` | Register datasets and files from mapfiles |
 
-| `pubflow publish` | Publish datasets |
+| `pubflow publication run` | Publish datasets |
 
-| `pubflow run-diagnostics` | Re-run failed datasets individually and capture server diagnostics |
+| `pubflow publication diagnose` | Re-run failed datasets individually and capture server diagnostics |
 
-| `pubflow cleanup-stac-items` | Preview or remove publisher-generated STAC JSON dumps |
+| `pubflow stac clean` | Preview or remove publisher-generated STAC JSON dumps |
 
-| `pubflow validate` | Validate registered datasets |
+| `pubflow dataset validate` | Validate registered datasets |
 
-| `pubflow export` | Export database state to CSV |
+| `pubflow report export` | Export database state to CSV |
 
 | `pubflow grist` | Synchronize workflow status with Grist |
 
-| `pubflow archive` | Generate portable archive tasks |
+| `pubflow archive generate` | Generate portable archive tasks |
 
-> **Note:** Running `pubflow` without a command displays the version.
+The 0.2 command line follows `pubflow <subject> <action>`. The former
+top-level action commands remain available as hidden, deprecated aliases for
+the 0.2 release, except `pubflow archive`: the `archive` name is now the
+command group, so task generation uses `pubflow archive generate`.
+
+> **Note:** Running `pubflow` without a command displays command help.
 
 ---
 
@@ -432,7 +437,7 @@ Registration scans a campaign's mapfile directory and registers datasets and the
 
 ```bash
 
-pubflow register tipmip-cnrm
+pubflow dataset register tipmip-cnrm
 
 ```
 
@@ -464,7 +469,7 @@ Publish datasets for a campaign:
 
 ```bash
 
-pubflow publish tipmip-cnrm
+pubflow publication run tipmip-cnrm
 
 ```
 
@@ -474,7 +479,7 @@ Use a limit when testing:
 
 ```bash
 
-pubflow publish tipmip-cnrm --limit 10
+pubflow publication run tipmip-cnrm --limit 10
 
 ```
 
@@ -483,7 +488,7 @@ per batch:
 
 ```bash
 
-pubflow publish tipmip-cnrm --batch-size 50
+pubflow publication run tipmip-cnrm --batch-size 50
 
 ```
 
@@ -587,7 +592,7 @@ transaction service:
 
 ```bash
 
-pubflow run-diagnostics tipmip-cnrm
+pubflow publication diagnose tipmip-cnrm
 
 ```
 
@@ -629,7 +634,7 @@ per-run copy alongside the diagnostic logs, including a recovered item:
 
 ```bash
 
-pubflow run-diagnostics tipmip-cnrm --persist-stac-item
+pubflow publication diagnose tipmip-cnrm --persist-stac-item
 
 ```
 
@@ -639,7 +644,7 @@ and item ID before treating a file as a generated STAC Item:
 
 ```bash
 
-pubflow cleanup-stac-items \
+pubflow stac clean \
     --directory /home/esguser/esgf-publisher-workflow \
     --pattern 'CMIP6.ScenarioMIP.IPSL.IPSL-CM*.json'
 
@@ -649,7 +654,7 @@ After reviewing the preview, repeat with `--delete`:
 
 ```bash
 
-pubflow cleanup-stac-items \
+pubflow stac clean \
     --directory /home/esguser/esgf-publisher-workflow \
     --pattern 'CMIP6.ScenarioMIP.IPSL.IPSL-CM*.json' \
     --delete
@@ -673,7 +678,7 @@ Useful limiting form for the first production run:
 
 ```bash
 
-pubflow run-diagnostics tipmip-cnrm --limit 5 --no-sync-grist
+pubflow publication diagnose tipmip-cnrm --limit 5 --no-sync-grist
 
 ```
 
@@ -685,7 +690,7 @@ Validate registered datasets without triggering publication:
 
 ```bash
 
-pubflow validate tipmip-cnrm
+pubflow dataset validate tipmip-cnrm
 
 ```
 
@@ -699,7 +704,7 @@ Export the current database state to CSV:
 
 ```bash
 
-pubflow export tipmip-cnrm
+pubflow report export --output campaign_status.csv
 
 ```
 
@@ -907,7 +912,7 @@ archive_status = PENDING
 
 ```bash
 
-pubflow archive tipmip-cnrm
+pubflow archive generate tipmip-cnrm
 
 ```
 
@@ -915,7 +920,7 @@ Use a limit for testing:
 
 ```bash
 
-pubflow archive tipmip-cnrm --limit 10
+pubflow archive generate tipmip-cnrm --limit 10
 
 ```
 
@@ -1350,23 +1355,23 @@ python workflow/campaign.py
 
 # Register datasets
 
-pubflow register tipmip-cnrm
+pubflow dataset register tipmip-cnrm
 
 # Optionally validate datasets
 
-pubflow validate tipmip-cnrm
+pubflow dataset validate tipmip-cnrm
 
 # Test a small publication batch
 
-pubflow publish tipmip-cnrm --limit 10
+pubflow publication run tipmip-cnrm --limit 10
 
 # Publish the campaign
 
-pubflow publish tipmip-cnrm
+pubflow publication run tipmip-cnrm
 
 # Export status
 
-pubflow export tipmip-cnrm
+pubflow report export --output campaign_status.csv
 
 # Synchronize status to Grist
 
@@ -1374,7 +1379,7 @@ pubflow grist sync
 
 # Generate archive tasks
 
-pubflow archive tipmip-cnrm
+pubflow archive generate tipmip-cnrm
 
 # Transfer archive_tasks.csv to the computing centre
 

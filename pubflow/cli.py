@@ -22,10 +22,27 @@ app = typer.Typer(
 )
 
 campaign_app = typer.Typer(help="Campaign management commands.")
+dataset_app = typer.Typer(help="Dataset registration and validation commands.")
+publication_app = typer.Typer(help="Dataset publication commands.")
+archive_app = typer.Typer(help="Archive workflow commands.")
+stac_app = typer.Typer(help="STAC item maintenance commands.")
 grist_app = typer.Typer(help="Grist integration commands.")
+report_app = typer.Typer(help="Reporting and export commands.")
 
 app.add_typer(campaign_app, name="campaign")
+app.add_typer(dataset_app, name="dataset")
+app.add_typer(publication_app, name="publication")
+app.add_typer(archive_app, name="archive")
+app.add_typer(stac_app, name="stac")
 app.add_typer(grist_app, name="grist")
+app.add_typer(report_app, name="report")
+
+
+def warn_deprecated(old_command, new_command):
+    typer.echo(
+        f"Warning: `{old_command}` is deprecated; use `{new_command}` instead.",
+        err=True,
+    )
 
 
 def format_duration(seconds):
@@ -50,8 +67,8 @@ def campaign_load():
         raise typer.Exit(code=1)
 
 
-@app.command()
-def register(
+@dataset_app.command("register")
+def dataset_register(
         campaign_name: str,
         register_files: bool = typer.Option(
             False,
@@ -145,8 +162,8 @@ def register(
     )
 
 
-@app.command()
-def publish(
+@publication_app.command("run")
+def publication_run(
         campaign: str,
         limit: int | None = None,
         batch_size: int = 50,
@@ -172,8 +189,8 @@ def publish(
         raise typer.Exit(code=1)
 
 
-@app.command()
-def validate(campaign: str, limit: int | None = None):
+@dataset_app.command("validate")
+def dataset_validate(campaign: str, limit: int | None = None):
     """Validate datasets belonging to a campaign."""
     try:
         success = validate_campaign(campaign, limit=limit)
@@ -185,8 +202,8 @@ def validate(campaign: str, limit: int | None = None):
         raise typer.Exit(code=1)
 
 
-@app.command()
-def export(output: str = "campaign_status.csv"):
+@report_app.command("export")
+def report_export(output: str = "campaign_status.csv"):
     """Export campaign and dataset status to CSV."""
     try:
         export_campaign_status(output)
@@ -241,8 +258,8 @@ def grist_check():
         raise typer.Exit(code=1)
 
 
-@app.command()
-def archive(
+@archive_app.command("generate")
+def archive_generate(
         campaign_name: str,
         limit: int | None = typer.Option(None),
         output: str = typer.Option("archive_tasks.csv"),
@@ -261,7 +278,7 @@ def archive(
         raise typer.Exit(code=1)
 
 
-@app.command("archive-import")
+@archive_app.command("import")
 def archive_import(results_file: str):
     """Import archive results into DuckDB."""
     try:
@@ -277,8 +294,8 @@ def archive_import(results_file: str):
         raise typer.Exit(code=1)
 
 
-@app.command("retry")
-def retry(
+@publication_app.command("retry")
+def publication_retry(
         campaign: str,
         limit: int = typer.Option(
             None,
@@ -296,8 +313,8 @@ def retry(
         raise typer.Exit(code=1)
 
 
-@app.command("run-diagnostics")
-def run_diagnostics_command(
+@publication_app.command("diagnose")
+def publication_diagnose(
         campaign: str,
         limit: int | None = typer.Option(None, "--limit", "-l"),
         persist_stac_item: bool = typer.Option(
@@ -345,8 +362,8 @@ def run_diagnostics_command(
         typer.echo(f"  Grist warning:     {result['grist_error']}")
 
 
-@app.command("cleanup-stac-items")
-def cleanup_stac_items_command(
+@stac_app.command("clean")
+def stac_clean(
         directory: Path = typer.Option(
             Path("."),
             "--directory",
@@ -387,10 +404,90 @@ def cleanup_stac_items_command(
     if not delete and result["count"]:
         typer.echo("Preview only; repeat with --delete to remove these files.")
 
+
+# Hidden compatibility commands keep existing operator scripts working through
+# the 0.2 release while steering new usage toward the subject/action grammar.
+@app.command("register", hidden=True)
+def legacy_register(
+        campaign_name: str,
+        register_files: bool = typer.Option(False, "--register-files"),
+        batch_size: int = typer.Option(100, "--batch-size"),
+):
+    warn_deprecated("pubflow register", "pubflow dataset register")
+    return dataset_register(campaign_name, register_files, batch_size)
+
+
+@app.command("validate", hidden=True)
+def legacy_validate(campaign: str, limit: int | None = None):
+    warn_deprecated("pubflow validate", "pubflow dataset validate")
+    return dataset_validate(campaign, limit)
+
+
+@app.command("publish", hidden=True)
+def legacy_publish(
+        campaign: str,
+        limit: int | None = None,
+        batch_size: int = 50,
+        dry_run: bool = False,
+):
+    warn_deprecated("pubflow publish", "pubflow publication run")
+    return publication_run(campaign, limit, batch_size, dry_run)
+
+
+@app.command("retry", hidden=True)
+def legacy_retry(
+        campaign: str,
+        limit: int = typer.Option(None, "--limit", "-l"),
+):
+    warn_deprecated("pubflow retry", "pubflow publication retry")
+    return publication_retry(campaign, limit)
+
+
+@app.command("run-diagnostics", hidden=True)
+def legacy_diagnostics(
+        campaign: str,
+        limit: int | None = typer.Option(None, "--limit", "-l"),
+        persist_stac_item: bool = typer.Option(False, "--persist-stac-item"),
+        sync_grist: bool = typer.Option(True, "--sync-grist/--no-sync-grist"),
+):
+    warn_deprecated(
+        "pubflow run-diagnostics",
+        "pubflow publication diagnose",
+    )
+    return publication_diagnose(
+        campaign,
+        limit,
+        persist_stac_item,
+        sync_grist,
+    )
+
+
+@app.command("cleanup-stac-items", hidden=True)
+def legacy_stac_cleanup(
+        directory: Path = typer.Option(Path("."), "--directory", "-d"),
+        pattern: str = typer.Option("CMIP*.json", "--pattern"),
+        delete: bool = typer.Option(False, "--delete"),
+):
+    warn_deprecated("pubflow cleanup-stac-items", "pubflow stac clean")
+    return stac_clean(directory, pattern, delete)
+
+
+@app.command("archive-import", hidden=True)
+def legacy_archive_import(results_file: str):
+    warn_deprecated("pubflow archive-import", "pubflow archive import")
+    return archive_import(results_file)
+
+
+@app.command("export", hidden=True)
+def legacy_export(output: str = "campaign_status.csv"):
+    warn_deprecated("pubflow export", "pubflow report export")
+    return report_export(output)
+
+
 @app.command()
 def version():
     """Show the pubflow version."""
-    typer.echo("pubflow 0.1.0")
+    typer.echo("pubflow 0.2.0")
 
 
 if __name__ == "__main__":
