@@ -6,6 +6,8 @@ publisher:
     size: 100
   execution:
     dry_run: false
+    timeout_seconds: 600
+    no_status_retries: 0
   logging:
     directory: logs
   stac_items:

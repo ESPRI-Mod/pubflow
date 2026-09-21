@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 import sys
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -229,12 +230,33 @@ def record_no_status_attempt(
         error_message,
 ):
     """Record an ambiguous attempt without changing the PENDING dataset."""
+    record_incomplete_attempt(
+        conn,
+        dataset_id,
+        run_id,
+        "NO_STATUS",
+        exit_code,
+        log_file,
+        error_message,
+    )
+
+
+def record_incomplete_attempt(
+        conn,
+        dataset_id,
+        run_id,
+        status,
+        exit_code,
+        log_file,
+        error_message,
+):
+    """Record an incomplete attempt without changing the dataset status."""
     create_attempt(conn, dataset_id, run_id)
     finish_attempt(
         conn,
         dataset_id,
         run_id,
-        "NO_STATUS",
+        status,
         exit_code,
         str(log_file),
         error_message,
@@ -344,6 +366,7 @@ def publish_batch(
         log_file,
         batch_number,
         record_missing_status=False,
+        timeout_seconds=None,
 ):
     conn = connect()
     results = []
@@ -419,16 +442,30 @@ def publish_batch(
                 log.write(
                     "-" * 70 + "\n"
                 )
-                result = subprocess.run(
-                    command,
-                    cwd=stac_staging_directory,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-                output = result.stdout or ""
+                timed_out = False
+                try:
+                    result = subprocess.run(
+                        command,
+                        cwd=stac_staging_directory,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        timeout=timeout_seconds,
+                    )
+                    output = result.stdout or ""
+                    return_code = result.returncode
+                except subprocess.TimeoutExpired as exc:
+                    timed_out = True
+                    output = exc.stdout or ""
+                    if isinstance(output, bytes):
+                        output = output.decode(errors="replace")
+                    return_code = 124
+                    log.write(
+                        f"\nPublisher timed out after "
+                        f"{timeout_seconds} seconds\n"
+                    )
                 log.write(output)
-                log.write(f"\nPublisher exit code: {result.returncode}\n")
+                log.write(f"\nPublisher exit code: {return_code}\n")
                 log.write(f"Publisher output length: {len(output)}\n")
 
             statuses, unknown_ids = parse_publication_statuses(
@@ -449,25 +486,33 @@ def publish_batch(
                 not statuses
                 and not results
                 and record_missing_status
-                and len(staged_datasets) == 1
             ):
                 dataset_id = staged_datasets[0][0]
-                no_status_error = error_message or (
-                    "esgpublish returned no recognizable PUB_STATUS line "
-                    f"(exit code {result.returncode}, "
-                    f"output length {len(output)})"
-                )
-                record_no_status_attempt(
+                attempt_status = "TIMEOUT" if timed_out else "NO_STATUS"
+                no_status_error = error_message
+                if timed_out:
+                    no_status_error = (
+                        f"esgpublish timed out after {timeout_seconds} seconds"
+                    )
+                elif not no_status_error:
+                    no_status_error = (
+                        "esgpublish returned no recognizable PUB_STATUS line "
+                        f"(exit code {return_code}, "
+                        f"output length {len(output)})"
+                    )
+                record_incomplete_attempt(
                     conn,
                     dataset_id,
                     run_id,
-                    result.returncode,
+                    attempt_status,
+                    return_code,
                     log_file,
                     no_status_error,
                 )
                 with open(log_file, "a") as log:
                     log.write(
-                        f"DEFERRED {dataset_id}: {no_status_error}\n"
+                        f"DEFERRED {dataset_id} ({attempt_status}): "
+                        f"{no_status_error}\n"
                     )
                 conn.commit()
                 return []
@@ -496,14 +541,14 @@ def publish_batch(
                     dataset_id,
                     run_id,
                     status,
-                    result.returncode,
+                    return_code,
                     log_file,
                     dataset_error,
                 )
                 results.append(PublicationResult(
                     dataset_id=dataset_id,
                     status=status,
-                    exit_code=result.returncode,
+                    exit_code=return_code,
                     log_file=str(log_file),
                     error_message=dataset_error,
                 ))
@@ -565,9 +610,21 @@ def publish_campaign(
         campaign,
         limit=None,
         batch_size=50,
+        timeout_seconds=None,
+        no_status_retries=None,
 ):
     if batch_size <= 0:
         raise ValueError("batch_size must be greater than zero")
+
+    execution = get_publisher_config().get("execution", {})
+    if timeout_seconds is None:
+        timeout_seconds = execution.get("timeout_seconds", 600)
+    if no_status_retries is None:
+        no_status_retries = execution.get("no_status_retries", 0)
+    if timeout_seconds is not None and timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be greater than zero")
+    if no_status_retries < 0:
+        raise ValueError("no_status_retries cannot be negative")
 
     run_id = create_run_id(campaign)
 
@@ -592,6 +649,8 @@ def publish_campaign(
         log.write(f"Run ID: {run_id}\n")
         log.write(f"Started: {datetime.now()}\n")
         log.write(f"Batch size: {batch_size}\n")
+        log.write(f"Publisher timeout: {timeout_seconds} seconds\n")
+        log.write(f"No-status retries: {no_status_retries}\n")
         log.write(f"ESG publisher profile: {profile}\n")
         log.write(f"ESG publisher config: {esg_config}\n")
         if limit is not None:
@@ -611,37 +670,16 @@ def publish_campaign(
         )
 
     total_processed = 0
-    total_considered = 0
     batch_number = 0
     deferred_dataset_ids = set()
+    selected_datasets = get_campaign_datasets(campaign, limit=limit)
+    work_queue = deque(selected_datasets)
 
-    while True:
-        remaining = None
-
-        if limit is not None:
-            remaining = (
-                    limit - total_considered
-            )
-
-            if remaining <= 0:
-                break
-
-        current_batch_size = batch_size
-
-        if remaining is not None:
-            current_batch_size = min(
-                batch_size,
-                remaining,
-            )
-
-        datasets = get_campaign_datasets(
-            campaign,
-            limit=current_batch_size,
-            exclude_dataset_ids=deferred_dataset_ids,
-        )
-
-        if not datasets:
-            break
+    while work_queue:
+        datasets = [
+            work_queue.popleft()
+            for _ in range(min(batch_size, len(work_queue)))
+        ]
 
         batch_number += 1
 
@@ -657,45 +695,53 @@ def publish_campaign(
             run_id,
             log_file,
             batch_number,
+            record_missing_status=(no_status_retries == 0),
+            timeout_seconds=timeout_seconds,
         )
 
-        if not results:
+        if not results and no_status_retries:
             isolated_dataset = datasets[0]
             print(
                 "No recognizable PUB_STATUS lines; retrying the first "
-                "dataset in isolation"
+                f"dataset up to {no_status_retries} time(s)"
             )
-            with open(log_file, "a") as log:
-                log.write(
-                    "No recognizable PUB_STATUS lines for batch "
-                    f"{batch_number}; isolating {isolated_dataset[0]}\n"
+            for retry_number in range(1, no_status_retries + 1):
+                with open(log_file, "a") as log:
+                    log.write(
+                        "No recognizable PUB_STATUS lines for batch "
+                        f"{batch_number}; retry {retry_number}/"
+                        f"{no_status_retries} for {isolated_dataset[0]}\n"
+                    )
+                results = publish_batch(
+                    [isolated_dataset],
+                    run_id,
+                    log_file,
+                    f"{batch_number}-retry-{retry_number}",
+                    record_missing_status=(
+                        retry_number == no_status_retries
+                    ),
+                    timeout_seconds=timeout_seconds,
                 )
+                if results:
+                    break
 
-            results = publish_batch(
-                [isolated_dataset],
-                run_id,
-                log_file,
-                f"{batch_number}-isolation",
-                record_missing_status=True,
+        if not results:
+            dataset_id = datasets[0][0]
+            deferred_dataset_ids.add(dataset_id)
+            unreached = datasets[1:]
+            work_queue.extendleft(reversed(unreached))
+            print(
+                f"DEFERRED {dataset_id}: no recognizable PUB_STATUS; "
+                "it remains PENDING and will be skipped for this run"
             )
-
-            if not results:
-                dataset_id = isolated_dataset[0]
-                deferred_dataset_ids.add(dataset_id)
-                total_considered += 1
-                print(
-                    f"DEFERRED {dataset_id}: no recognizable PUB_STATUS; "
-                    "it remains PENDING and will be skipped for this run"
-                )
-                print()
-                print(f"Batch {batch_number} complete")
-                continue
+            print()
+            print(f"Batch {batch_number} complete")
+            continue
 
         for result in results:
             summary.add_result(result)
             processed_count += 1
             total_processed += 1
-            total_considered += 1
 
             if result.status == "SUCCESS":
                 print(
@@ -720,7 +766,14 @@ def publish_campaign(
 
                 failed_count += 1
 
-        unattempted_count = len(datasets) - len(results)
+        completed_ids = {result.dataset_id for result in results}
+        unreached = [
+            dataset
+            for dataset in datasets
+            if dataset[0] not in completed_ids
+        ]
+        work_queue.extendleft(reversed(unreached))
+        unattempted_count = len(unreached)
         if unattempted_count:
             print(
                 f"PENDING {unattempted_count} datasets not reached "

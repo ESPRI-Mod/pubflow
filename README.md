@@ -249,6 +249,10 @@ publisher:
 
     dry_run: false
 
+    timeout_seconds: 600
+
+    no_status_retries: 0
+
   logging:
 
     directory: logs
@@ -501,12 +505,28 @@ the publisher stops at the first failure, mapfiles it did not reach remain
 reported publication attempt and updates the corresponding dataset state in
 DuckDB.
 
-If an entire batch returns no recognizable `PUB_STATUS`, Pubflow retries its
-first dataset alone. If the isolated retry is also status-less, the attempt is
-recorded as `NO_STATUS`, the dataset remains `PENDING`, and it is deferred for
-the remainder of the current run. Publication then continues with the other
-pending datasets. The run summary and log list every deferred dataset, along
-with the publisher exit code and output length.
+If an entire batch returns no recognizable `PUB_STATUS`, its first dataset is
+recorded as `NO_STATUS`, remains `PENDING`, and is deferred for the remainder
+of the current run. It is not immediately published a second time by default.
+Publication continues with the unreached datasets from an in-memory work queue,
+without repeatedly scanning the pending table or building a growing SQL
+exclusion list.
+
+Each publisher invocation has a default 600-second timeout. A timeout is
+recorded as `TIMEOUT`, while the dataset remains `PENDING`. Both settings can
+be overridden for an individual run:
+
+```bash
+
+pubflow publication run tipmip-cnrm \
+    --timeout-seconds 300 \
+    --no-status-retries 0
+
+```
+
+Set `--no-status-retries` above zero only when an immediate isolated retry is
+worth its additional publication cost. The run summary and log list every
+deferred dataset.
 
 ### Retries
 

@@ -168,6 +168,16 @@ def publication_run(
         limit: int | None = None,
         batch_size: int = 50,
         dry_run: bool = False,
+        timeout_seconds: int | None = typer.Option(
+            None,
+            "--timeout-seconds",
+            help="Maximum runtime for one esgpublish invocation.",
+        ),
+        no_status_retries: int | None = typer.Option(
+            None,
+            "--no-status-retries",
+            help="Immediate retries after a publisher returns no status.",
+        ),
 ):
     """Publish datasets belonging to a campaign."""
     try:
@@ -176,6 +186,8 @@ def publication_run(
                 campaign,
                 limit=limit,
                 batch_size=batch_size,
+                timeout_seconds=timeout_seconds,
+                no_status_retries=no_status_retries,
             )
         else:
             publish_campaign(
@@ -429,9 +441,24 @@ def legacy_publish(
         limit: int | None = None,
         batch_size: int = 50,
         dry_run: bool = False,
+        timeout_seconds: int | None = typer.Option(
+            None,
+            "--timeout-seconds",
+        ),
+        no_status_retries: int | None = typer.Option(
+            None,
+            "--no-status-retries",
+        ),
 ):
     warn_deprecated("pubflow publish", "pubflow publication run")
-    return publication_run(campaign, limit, batch_size, dry_run)
+    return publication_run(
+        campaign,
+        limit,
+        batch_size,
+        dry_run,
+        timeout_seconds,
+        no_status_retries,
+    )
 
 
 @app.command("retry", hidden=True)

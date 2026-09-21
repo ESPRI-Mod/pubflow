@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import ANY, call, patch
+from unittest.mock import patch
 
 import duckdb
 
@@ -173,11 +173,11 @@ class NoStatusHandlingTests(unittest.TestCase):
                 ),
                 patch(
                     "workflow.executor.get_campaign_datasets",
-                    side_effect=[[dataset_a, dataset_b], [dataset_b], []],
+                    return_value=[dataset_a, dataset_b],
                 ) as select_mock,
                 patch(
                     "workflow.executor.publish_batch",
-                    side_effect=[[], [], [success]],
+                    side_effect=[[], [success]],
                 ) as publish_mock,
                 patch(
                     "workflow.executor.trigger_grist_sync",
@@ -189,20 +189,92 @@ class NoStatusHandlingTests(unittest.TestCase):
 
         self.assertIn("DEFERRED dataset-a", output.getvalue())
         self.assertIn("SUCCESS dataset-b", output.getvalue())
-        self.assertEqual(
-            publish_mock.call_args_list[1],
-            call(
-                [dataset_a],
-                ANY,
-                log_file,
-                "1-isolation",
-                record_missing_status=True,
-            ),
+        self.assertEqual(select_mock.call_count, 1)
+        self.assertEqual(publish_mock.call_count, 2)
+        self.assertEqual(publish_mock.call_args_list[0].args[0], [dataset_a, dataset_b])
+        self.assertTrue(
+            publish_mock.call_args_list[0].kwargs["record_missing_status"]
         )
-        self.assertEqual(
-            select_mock.call_args_list[1].kwargs["exclude_dataset_ids"],
-            {"dataset-a"},
-        )
+        self.assertEqual(publish_mock.call_args_list[1].args[0], [dataset_b])
+
+    def test_timeout_is_recorded_without_changing_dataset_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database_path = root / "publications.duckdb"
+            mapfile = root / "dataset.map"
+            mapfile.write_text("dataset-a | /data/example.nc | 1\n")
+            log_file = root / "run.log"
+            log_file.write_text("")
+            schema = (
+                Path(__file__).resolve().parents[1] / "db" / "schema.sql"
+            ).read_text()
+            conn = duckdb.connect(str(database_path))
+            conn.execute(schema)
+            conn.execute(
+                """
+                INSERT INTO campaigns
+                (name, project, activity, institution, mapfile_root)
+                VALUES ('test', 'CMIP6', 'CMIP', 'IPSL', '/maps')
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO datasets
+                (dataset_id, campaign, project, activity, institution, mapfile,
+                 publication_status)
+                VALUES ('dataset-a', 'test', 'CMIP6', 'CMIP', 'IPSL', ?,
+                        'PENDING')
+                """,
+                [str(mapfile)],
+            )
+            conn.close()
+
+            previous_database_path = database.DB_PATH
+            database.DB_PATH = database_path
+            try:
+                with (
+                    patch(
+                        "workflow.executor.get_mapfile_path_mappings",
+                        return_value=[],
+                    ),
+                    patch(
+                        "workflow.executor.build_publish_command",
+                        return_value=["esgpublish", "--map", "/tmp/maps"],
+                    ),
+                    patch(
+                        "workflow.executor.subprocess.run",
+                        side_effect=subprocess.TimeoutExpired(
+                            ["esgpublish"],
+                            timeout=30,
+                            output="partial output",
+                        ),
+                    ),
+                ):
+                    results = publish_batch(
+                        [("dataset-a", str(mapfile), "PENDING")],
+                        "run-timeout",
+                        log_file,
+                        1,
+                        record_missing_status=True,
+                        timeout_seconds=30,
+                    )
+            finally:
+                database.DB_PATH = previous_database_path
+
+            conn = duckdb.connect(str(database_path))
+            dataset_status = conn.execute(
+                "SELECT publication_status FROM datasets "
+                "WHERE dataset_id = 'dataset-a'"
+            ).fetchone()[0]
+            attempt = conn.execute(
+                "SELECT status, exit_code FROM publication_attempts "
+                "WHERE dataset_id = 'dataset-a'"
+            ).fetchone()
+            conn.close()
+
+        self.assertEqual(results, [])
+        self.assertEqual(dataset_status, "PENDING")
+        self.assertEqual(attempt, ("TIMEOUT", 124))
 
 
 if __name__ == "__main__":
