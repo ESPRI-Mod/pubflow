@@ -742,6 +742,20 @@ pubflow grist sync
 
 ```
 
+Grist writes are limited by both record count and serialized payload size.
+Pubflow defaults to a conservative 750 KiB request body and automatically
+splits a batch again if Grist or its reverse proxy responds with HTTP 413. The
+local threshold can be adjusted when necessary:
+
+```bash
+
+export GRIST_MAX_PAYLOAD_BYTES=524288
+
+```
+
+If even one record exceeds the server limit, synchronization stops with an
+error identifying the affected table and the serialized record size.
+
 The Grist document contains three main workflow tables and an optional
 diagnostics table:
 
