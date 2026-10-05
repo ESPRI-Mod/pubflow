@@ -12,7 +12,7 @@ from workflow.diagnostics import run_diagnostics
 from workflow.executor import dry_run_campaign, publish_campaign, retry_campaign
 from workflow.exporter import export_campaign_status, sync_to_grist
 from workflow.grist import check_connection, get_table_columns, list_tables
-from workflow.registry import register_dataset
+from workflow.registry import reconcile_campaign_datasets, register_dataset
 from workflow.stac_cleanup import cleanup_stac_items
 from workflow.validator import validate_campaign
 
@@ -83,22 +83,19 @@ def dataset_register(
     """Register all mapfiles belonging to a campaign."""
     campaign = get_campaign(campaign_name)
     mapfile_root = Path(campaign["mapfile_root"])
-
     if not mapfile_root.exists():
         raise typer.BadParameter(
             f"Mapfile root does not exist: {mapfile_root}"
         )
-
     mapfiles = list(mapfile_root.rglob("*.map"))
     typer.echo(f"Found {len(mapfiles)} mapfiles")
-
     drs_generator = DrsGenerator(campaign["project"].lower())
     conn = connect()
-
     success = 0
     failed = 0
+    current_dataset_ids = set()
+    reconciliation = {"current": 0, "removed": 0}
     start_total = time.monotonic()
-
     with tqdm(
             total=len(mapfiles),
             desc="Registering",
@@ -109,8 +106,9 @@ def dataset_register(
             conn.execute("BEGIN")
 
             try:
+                batch_results = []
                 for mapfile in batch:
-                    register_dataset(
+                    result = register_dataset(
                         conn,
                         campaign_name,
                         campaign,
@@ -118,17 +116,22 @@ def dataset_register(
                         drs_generator,
                         register_files=register_files,
                     )
-                    success += 1
-                    progress.update(1)
+                    batch_results.append(result)
 
                 conn.execute("COMMIT")
+                success += len(batch_results)
+                current_dataset_ids.update(
+                    result["dataset_id"] for result in batch_results
+                )
+                progress.update(len(batch))
 
             except Exception:
                 conn.execute("ROLLBACK")
 
                 for mapfile in batch:
+                    conn.execute("BEGIN")
                     try:
-                        register_dataset(
+                        result = register_dataset(
                             conn,
                             campaign_name,
                             campaign,
@@ -138,6 +141,7 @@ def dataset_register(
                         )
                         conn.execute("COMMIT")
                         success += 1
+                        current_dataset_ids.add(result["dataset_id"])
 
                     except Exception as exc:
                         conn.execute("ROLLBACK")
@@ -145,16 +149,34 @@ def dataset_register(
                         typer.echo(f"FAILED {mapfile}: {exc}")
 
                     progress.update(1)
-
+    if failed:
+        typer.echo(
+            "Skipping stale dataset cleanup because registration failures "
+            "occurred."
+        )
+        reconciliation["current"] = len(current_dataset_ids)
+    else:
+        conn.execute("BEGIN")
+        try:
+            reconciliation = reconcile_campaign_datasets(
+                conn,
+                campaign_name,
+                current_dataset_ids,
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            conn.close()
+            raise
     conn.close()
-
     elapsed = time.monotonic() - start_total
     rate = success / elapsed if elapsed else 0
-
     typer.echo("")
     typer.echo("Registration complete")
     typer.echo(f"  Succeeded:      {success}")
     typer.echo(f"  Failed:         {failed}")
+    typer.echo(f"  Current:        {reconciliation['current']} datasets")
+    typer.echo(f"  Stale removed:  {reconciliation['removed']} datasets")
     typer.echo(f"  Duration:       {format_duration(elapsed)}")
     typer.echo(f"  Rate:           {rate:.2f} mapfiles/s")
     typer.echo(

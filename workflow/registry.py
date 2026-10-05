@@ -117,8 +117,7 @@ def register_dataset(
 
     conn.execute(
         """
-        INSERT
-        OR IGNORE INTO datasets
+        INSERT INTO datasets
         (
             dataset_id,
             campaign,
@@ -129,6 +128,13 @@ def register_dataset(
             mapfile
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (dataset_id) DO UPDATE SET
+            campaign = EXCLUDED.campaign,
+            project = EXCLUDED.project,
+            activity = EXCLUDED.activity,
+            institution = EXCLUDED.institution,
+            drs = EXCLUDED.drs,
+            mapfile = EXCLUDED.mapfile
         """,
         [
             dataset_id,
@@ -142,10 +148,13 @@ def register_dataset(
     )
 
     if register_files:
+        conn.execute(
+            "DELETE FROM files WHERE dataset_id = ?",
+            [dataset_id],
+        )
         conn.executemany(
             """
-            INSERT
-            OR IGNORE INTO files
+            INSERT INTO files
             (
                 dataset_id,
                 file_path,
@@ -170,4 +179,33 @@ def register_dataset(
     return {
         "dataset_id": dataset_id,
         "files": len(files),
+    }
+
+
+def reconcile_campaign_datasets(conn, campaign_name, current_dataset_ids):
+    """Remove campaign datasets absent from its authoritative registration."""
+    current_dataset_ids = set(current_dataset_ids)
+    existing_dataset_ids = {
+        row[0]
+        for row in conn.execute(
+            "SELECT dataset_id FROM datasets WHERE campaign = ?",
+            [campaign_name],
+        ).fetchall()
+    }
+    stale_dataset_ids = existing_dataset_ids - current_dataset_ids
+
+    if stale_dataset_ids:
+        parameters = [(dataset_id,) for dataset_id in stale_dataset_ids]
+        conn.executemany(
+            "DELETE FROM files WHERE dataset_id = ?",
+            parameters,
+        )
+        conn.executemany(
+            "DELETE FROM datasets WHERE dataset_id = ?",
+            parameters,
+        )
+
+    return {
+        "current": len(current_dataset_ids),
+        "removed": len(stale_dataset_ids),
     }

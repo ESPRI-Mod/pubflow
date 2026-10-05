@@ -64,6 +64,54 @@ class LocalStacValidationTests(unittest.TestCase):
         self.assertTrue(result.valid)
         self.assertEqual(result.issues, [])
 
+    def test_validates_esgf_property_schema_against_item_properties(self):
+        schema_url = (
+            "https://example.test/cmip6plus/v2.2.1/schema.json"
+        )
+        item = {
+            "stac_extensions": [schema_url],
+            "properties": {
+                "base_id": "CMIP6Plus.TIPMIP.example",
+                "cmip6plus:activity_id": ["TIPMIP"],
+            },
+        }
+        schema = {
+            "type": "object",
+            "required": ["base_id", "cmip6plus:activity_id"],
+            "properties": {
+                "base_id": {"type": "string"},
+                "cmip6plus:activity_id": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+        }
+
+        result = self.validate(item, {schema_url: schema})
+
+        self.assertTrue(result.valid)
+        self.assertEqual(result.issues, [])
+
+    def test_property_schema_error_path_includes_properties(self):
+        schema_url = (
+            "https://example.test/cmip6plus/v2.2.1/schema.json"
+        )
+        item = {
+            "stac_extensions": [schema_url],
+            "properties": {"cmip6plus:activity_id": ["TIPMIP"]},
+        }
+        schema = {
+            "type": "object",
+            "required": ["base_id"],
+            "properties": {"base_id": {"type": "string"}},
+        }
+
+        result = self.validate(item, {schema_url: schema})
+
+        self.assertFalse(result.valid)
+        self.assertEqual(result.first_issue.path, "$.properties")
+        self.assertIn("base_id", result.first_issue.message)
+
     def test_schema_download_failure_is_not_reported_as_invalid_item(self):
         item = {"stac_extensions": ["https://example.test/schema.json"]}
         with tempfile.TemporaryDirectory() as directory:

@@ -84,10 +84,79 @@ def _suggestion(error):
     return matches[0] if matches else None
 
 
+STAC_ITEM_FIELDS = {
+    "assets",
+    "bbox",
+    "collection",
+    "geometry",
+    "id",
+    "links",
+    "properties",
+    "stac_extensions",
+    "stac_version",
+    "type",
+}
+
+
+def _resolve_local_ref(root_schema, reference):
+    if not reference.startswith("#/"):
+        return None
+    current = root_schema
+    for part in reference[2:].split("/"):
+        part = part.replace("~1", "/").replace("~0", "~")
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current if isinstance(current, dict) else None
+
+
+def _schema_contract(schema, root_schema=None, seen=None):
+    """Return field names governed at the schema's instance root."""
+    root_schema = root_schema or schema
+    seen = seen or set()
+    marker = id(schema)
+    if marker in seen:
+        return set()
+    seen.add(marker)
+
+    names = set(schema.get("required", []))
+    properties = schema.get("properties", {})
+    if isinstance(properties, dict):
+        names.update(properties)
+
+    reference = schema.get("$ref")
+    if isinstance(reference, str):
+        resolved = _resolve_local_ref(root_schema, reference)
+        if resolved is not None:
+            names.update(_schema_contract(resolved, root_schema, seen))
+
+    for keyword in ("allOf", "anyOf", "oneOf"):
+        for subschema in schema.get(keyword, []):
+            if isinstance(subschema, dict):
+                names.update(_schema_contract(subschema, root_schema, seen))
+    return names
+
+
+def _schema_instance(item, schema):
+    """Choose whether a declared extension governs the Item or properties."""
+    contract = _schema_contract(schema)
+    if contract & STAC_ITEM_FIELDS:
+        return item, ()
+
+    item_fields = set(item)
+    if contract and not contract & item_fields:
+        properties = item.get("properties")
+        if isinstance(properties, dict):
+            return properties, ("properties",)
+
+    return item, ()
+
+
 def _schema_issues(item, schema_url, schema):
+    instance, path_prefix = _schema_instance(item, schema)
     validator_class = jsonschema.validators.validator_for(schema)
     validator = validator_class(schema)
-    errors = sorted(validator.iter_errors(item), key=relevance)
+    errors = sorted(validator.iter_errors(instance), key=relevance)
     issues = []
     for error in errors:
         cause = error.context[0] if error.context else error
@@ -98,7 +167,7 @@ def _schema_issues(item, schema_url, schema):
             rejected = str(rejected)
         issues.append(ValidationIssue(
             schema_url=schema_url,
-            path=_json_path(cause.absolute_path),
+            path=_json_path((*path_prefix, *cause.absolute_path)),
             message=cause.message,
             validator=cause.validator,
             rejected_value=rejected,
