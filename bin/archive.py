@@ -3,6 +3,7 @@
 import argparse
 import csv
 import filecmp
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -17,7 +18,10 @@ def archive_tasks(task_file, dry_run=False):
 
     with open(task_file, newline="") as f:
         reader = csv.DictReader(f)
-        required = {"dataset_id", "mapfile", "archive_path"}
+        required = {
+            "task_id", "dataset_id", "mapfile", "mapfile_checksum",
+            "archive_path",
+        }
         missing = required - set(reader.fieldnames or [])
 
         if missing:
@@ -31,8 +35,10 @@ def archive_tasks(task_file, dry_run=False):
             destination = Path(row["archive_path"])
 
             result = {
+                "task_id": row["task_id"],
                 "dataset_id": dataset_id,
                 "mapfile": str(source),
+                "mapfile_checksum": row["mapfile_checksum"],
                 "archive_path": str(destination),
                 "status": None,
                 "error_message": "",
@@ -42,6 +48,11 @@ def archive_tasks(task_file, dry_run=False):
                 if not source.exists():
                     raise FileNotFoundError(
                         f"Source mapfile does not exist: {source}"
+                    )
+                actual_checksum = hashlib.sha256(source.read_bytes()).hexdigest()
+                if actual_checksum != row["mapfile_checksum"]:
+                    raise ValueError(
+                        "Source mapfile checksum differs from generated task"
                     )
 
                 if destination.exists():
@@ -105,7 +116,9 @@ def main():
             f,
             fieldnames=[
                 "dataset_id",
+                "task_id",
                 "mapfile",
+                "mapfile_checksum",
                 "archive_path",
                 "status",
                 "error_message",

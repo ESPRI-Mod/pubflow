@@ -1,8 +1,12 @@
 from unittest.mock import patch
+from pathlib import Path
 
 import pytest
 import requests
+import duckdb
 
+import workflow.database as database
+from workflow.exporter import get_dataset_records
 from workflow.grist import add_records_batched, payload_size
 
 
@@ -68,3 +72,33 @@ def test_single_record_413_has_actionable_error():
             batch_size=500,
             max_payload_bytes=10_000,
         )
+
+
+def test_retired_dataset_is_exported_as_retired(tmp_path, monkeypatch):
+    database_path = tmp_path / "grist.duckdb"
+    schema = (Path(__file__).resolve().parents[1] / "db" / "schema.sql").read_text()
+    conn = duckdb.connect(str(database_path))
+    conn.execute(schema)
+    conn.execute(
+        """
+        INSERT INTO campaigns
+        (name, project, activity, institution, mapfile_root)
+        VALUES ('campaign', 'CMIP6', 'CMIP', 'IPSL', '/maps')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO datasets
+        (dataset_id, campaign, project, activity, institution, mapfile,
+         registration_status, publication_status)
+        VALUES ('dataset', 'campaign', 'CMIP6', 'CMIP', 'IPSL', '/maps/a.map',
+                'RETIRED', 'SUCCESS')
+        """
+    )
+    conn.close()
+    monkeypatch.setattr(database, "DB_PATH", database_path)
+    database._MIGRATED_DATABASES.discard(str(database_path))
+
+    rows = get_dataset_records()
+
+    assert rows[0]["publication_status"] == "RETIRED"

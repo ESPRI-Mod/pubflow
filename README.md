@@ -468,8 +468,11 @@ Completed: 2445 succeeded, 1 failed
 Registration is therefore safe to run before a publication campaign begins.
 
 Registration treats a non-empty, successfully parsed mapfile scan as the
-authoritative campaign inventory. If the scan is unexpectedly empty, stale
-dataset cleanup is skipped by default. Removing the complete registered
+authoritative campaign inventory. Datasets absent from a successful scan are
+marked `RETIRED`; their files and publication history are retained, and they
+are excluded from validation, publication, diagnostics, and archival. A later
+scan reactivates a dataset if its mapfile returns. If the scan is unexpectedly
+empty, retirement is skipped by default. Retiring the complete registered
 inventory requires explicit confirmation:
 
 ```bash
@@ -1121,9 +1124,13 @@ Result format:
 
 |---|---|
 
+| task_id | UUID identifying the database-backed archive task |
+
 | dataset_id | Dataset identifier |
 
 | mapfile | Path to the mapfile |
+
+| mapfile_checksum | SHA-256 fingerprint captured when the task was generated |
 
 | archive_path | Destination archive path |
 
@@ -1135,9 +1142,14 @@ Example:
 
 ```csv
 
-TEST.DATASET,/source/test.map,/archive/.mapfiles/test.map,SUCCESS,
+3a9d...-task,TEST.DATASET,/source/test.map,9f86...checksum,/archive/.mapfiles/test.map,SUCCESS,
 
 ```
+
+The standalone executor verifies the source mapfile checksum before copying.
+When results are imported, Pubflow verifies the task UUID, dataset, checksum,
+destination, active registration state, and successful publication state in a
+single transaction. Results that do not match a persisted task are rejected.
 
 The current executor uses Python's `shutil.copy2()` and creates the destination directory when necessary.
 

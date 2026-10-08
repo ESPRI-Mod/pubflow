@@ -13,6 +13,7 @@ def get_pending_datasets(campaign, limit=None):
                    mapfile
             FROM datasets
             WHERE campaign = ?
+              AND registration_status = 'ACTIVE'
               AND publication_status = 'PENDING'
             ORDER BY dataset_id \
             """

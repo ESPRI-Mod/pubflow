@@ -55,6 +55,7 @@ def get_campaign_datasets(
             SELECT dataset_id, publication_claim_id
             FROM datasets
             WHERE campaign = ?
+              AND registration_status = 'ACTIVE'
               AND publication_status = 'PENDING'
               AND publication_claimed_at < ?
             """,
@@ -79,6 +80,7 @@ def get_campaign_datasets(
             SET publication_claim_id = NULL,
                 publication_claimed_at = NULL
             WHERE campaign = ?
+              AND registration_status = 'ACTIVE'
               AND publication_status = 'PENDING'
               AND publication_claimed_at < ?
             """,
@@ -90,6 +92,7 @@ def get_campaign_datasets(
                    publication_status
             FROM datasets
             WHERE campaign = ?
+              AND registration_status = 'ACTIVE'
               AND publication_status = 'PENDING'
               AND publication_claim_id IS NULL
             """

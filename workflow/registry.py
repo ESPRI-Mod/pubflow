@@ -135,6 +135,8 @@ def register_dataset(
             institution = EXCLUDED.institution,
             drs = EXCLUDED.drs,
             mapfile = EXCLUDED.mapfile,
+            registration_status = 'ACTIVE',
+            retired_at = NULL,
             publication_status = CASE
                 WHEN datasets.mapfile_checksum IS NULL
                   OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
@@ -215,12 +217,16 @@ def register_dataset(
 
 
 def reconcile_campaign_datasets(conn, campaign_name, current_dataset_ids):
-    """Remove campaign datasets absent from its authoritative registration."""
+    """Retire campaign datasets absent from its authoritative registration."""
     current_dataset_ids = set(current_dataset_ids)
     existing_dataset_ids = {
         row[0]
         for row in conn.execute(
-            "SELECT dataset_id FROM datasets WHERE campaign = ?",
+            """
+            SELECT dataset_id
+            FROM datasets
+            WHERE campaign = ? AND registration_status = 'ACTIVE'
+            """,
             [campaign_name],
         ).fetchall()
     }
@@ -229,15 +235,18 @@ def reconcile_campaign_datasets(conn, campaign_name, current_dataset_ids):
     if stale_dataset_ids:
         parameters = [(dataset_id,) for dataset_id in stale_dataset_ids]
         conn.executemany(
-            "DELETE FROM files WHERE dataset_id = ?",
-            parameters,
-        )
-        conn.executemany(
-            "DELETE FROM datasets WHERE dataset_id = ?",
+            """
+            UPDATE datasets
+            SET registration_status = 'RETIRED',
+                retired_at = CURRENT_TIMESTAMP,
+                publication_claim_id = NULL,
+                publication_claimed_at = NULL
+            WHERE dataset_id = ?
+            """,
             parameters,
         )
 
     return {
         "current": len(current_dataset_ids),
-        "removed": len(stale_dataset_ids),
+        "retired": len(stale_dataset_ids),
     }

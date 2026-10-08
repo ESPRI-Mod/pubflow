@@ -177,16 +177,32 @@ def main() -> int:
         local_ids = {normalize_id(row[0]) for row in con.execute("SELECT dataset_id FROM datasets").fetchall()}
         dataset_ids = {normalize_id(row["dataset_id"]) for row in grist_datasets}
         failure_ids = {normalize_id(row["dataset_id"]) for row in grist_failures}
+        retired_ids = {
+            normalize_id(row["dataset_id"])
+            for row in grist_datasets
+            if str(row.get("publication_status") or "").upper() == "RETIRED"
+        }
         referenced_ids = dataset_ids | failure_ids
         missing_local = sorted(referenced_ids - local_ids)
+        blocking_missing = sorted(
+            dataset_id
+            for dataset_id in dataset_ids - local_ids
+            if dataset_id not in retired_ids
+        )
         local_not_in_grist = sorted(local_ids - dataset_ids)
 
         print(f"Local datasets: {len(local_ids)}")
         print(f"Matched Grist dataset IDs: {len(dataset_ids & local_ids)}")
         print_examples("Grist-referenced IDs missing locally", missing_local)
+        print_examples(
+            "Missing retired IDs skipped during restore",
+            sorted(retired_ids - local_ids),
+        )
         print_examples("Local IDs absent from Grist Datasets (informational)", local_not_in_grist)
-        if missing_local:
-            raise RuntimeError("Not all Grist dataset IDs exist locally; no changes were made")
+        if blocking_missing:
+            raise RuntimeError(
+                "Not all active Grist dataset IDs exist locally; no changes were made"
+            )
 
         if "publication_status" not in dataset_schema:
             raise RuntimeError("DuckDB datasets table has no publication_status column")
@@ -238,13 +254,52 @@ def main() -> int:
         con.execute("BEGIN TRANSACTION")
         try:
             for row in grist_datasets:
-                con.execute(
-                    "UPDATE datasets SET publication_status = ? WHERE dataset_id = ?",
-                    [
-                        value_for_duckdb(row.get("publication_status"), dataset_schema["publication_status"]["type"]),
-                        normalize_id(row["dataset_id"]),
-                    ],
-                )
+                dataset_id = normalize_id(row["dataset_id"])
+                if dataset_id not in local_ids:
+                    continue
+                publication_status = str(
+                    row.get("publication_status") or ""
+                ).upper()
+                if publication_status == "RETIRED":
+                    if "registration_status" in dataset_schema:
+                        con.execute(
+                            """
+                            UPDATE datasets
+                            SET registration_status = 'RETIRED',
+                                retired_at = COALESCE(retired_at, CURRENT_TIMESTAMP)
+                            WHERE dataset_id = ?
+                            """,
+                            [dataset_id],
+                        )
+                    continue
+                if "registration_status" in dataset_schema:
+                    con.execute(
+                        """
+                        UPDATE datasets
+                        SET publication_status = ?,
+                            registration_status = 'ACTIVE',
+                            retired_at = NULL
+                        WHERE dataset_id = ?
+                        """,
+                        [
+                            value_for_duckdb(
+                                row.get("publication_status"),
+                                dataset_schema["publication_status"]["type"],
+                            ),
+                            dataset_id,
+                        ],
+                    )
+                else:
+                    con.execute(
+                        "UPDATE datasets SET publication_status = ? WHERE dataset_id = ?",
+                        [
+                            value_for_duckdb(
+                                row.get("publication_status"),
+                                dataset_schema["publication_status"]["type"],
+                            ),
+                            dataset_id,
+                        ],
+                    )
             if new_failure_rows:
                 names = ", ".join(quote_ident(column) for column in attempt_columns)
                 placeholders = ", ".join("?" for _ in attempt_columns)

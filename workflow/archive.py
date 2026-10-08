@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import csv
+import hashlib
 from pathlib import Path
+from uuid import uuid4
 
 from esgvoc.apps.drs.generator import DrsGenerator
 
@@ -13,9 +15,10 @@ def get_archivable_datasets(campaign, limit=None):
     conn = connect()
 
     query = """
-            SELECT dataset_id, mapfile, archive_status
+            SELECT dataset_id, mapfile, mapfile_checksum, archive_status
             FROM datasets
             WHERE campaign = ?
+              AND registration_status = 'ACTIVE'
               AND publication_status = 'SUCCESS'
               AND archive_status = 'PENDING'
             ORDER BY dataset_id \
@@ -88,16 +91,64 @@ def generate_archive_tasks(campaign_name, output, limit=None):
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(output, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["dataset_id", "mapfile", "archive_path"])
+    tasks = []
+    for dataset_id, mapfile, mapfile_checksum, _ in rows:
+        checksum = mapfile_checksum or hashlib.sha256(
+            Path(mapfile).read_bytes()
+        ).hexdigest()
+        tasks.append({
+            "task_id": str(uuid4()),
+            "dataset_id": dataset_id,
+            "mapfile": mapfile,
+            "mapfile_checksum": checksum,
+            "archive_path": str(get_archive_path(dataset_id, mapfile, campaign)),
+        })
 
-        for dataset_id, mapfile, _ in rows:
-            writer.writerow([
-                dataset_id,
-                mapfile,
-                str(get_archive_path(dataset_id, mapfile, campaign)),
+    temporary = output.with_suffix(output.suffix + ".tmp")
+    conn = connect()
+    try:
+        with open(temporary, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=[
+                "task_id",
+                "dataset_id",
+                "mapfile",
+                "mapfile_checksum",
+                "archive_path",
             ])
+            writer.writeheader()
+            writer.writerows(tasks)
+        conn.execute("BEGIN")
+        if tasks:
+            conn.executemany(
+                """
+                INSERT INTO archive_tasks
+                (task_id, dataset_id, campaign, mapfile_checksum,
+                 source_mapfile, archive_path)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        task["task_id"],
+                        task["dataset_id"],
+                        campaign_name,
+                        task["mapfile_checksum"],
+                        task["mapfile"],
+                        task["archive_path"],
+                    )
+                    for task in tasks
+                ],
+            )
+        conn.execute("COMMIT")
+        temporary.replace(output)
+    except Exception:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
+        temporary.unlink(missing_ok=True)
+        raise
+    finally:
+        conn.close()
 
     return len(rows)
 
@@ -116,6 +167,7 @@ def import_archive_results(results_file):
         "CONFLICT": 0,
         "FAILED": 0,
         "UNKNOWN_DATASET": 0,
+        "INVALID_TASK": 0,
         "UNKNOWN": 0,
     }
 
@@ -125,7 +177,10 @@ def import_archive_results(results_file):
         conn.execute("BEGIN")
         with open(results_file, newline="") as f:
             reader = csv.DictReader(f)
-            required = {"dataset_id", "status"}
+            required = {
+                "task_id", "dataset_id", "mapfile_checksum",
+                "archive_path", "status",
+            }
             missing = required - set(reader.fieldnames or [])
 
             if missing:
@@ -136,6 +191,22 @@ def import_archive_results(results_file):
             for row in reader:
                 dataset_id = row["dataset_id"]
                 status = row["status"]
+                task = conn.execute(
+                    """
+                    SELECT dataset_id, mapfile_checksum, archive_path, status
+                    FROM archive_tasks
+                    WHERE task_id = ?
+                    """,
+                    [row["task_id"]],
+                ).fetchone()
+                if task is None or task[:3] != (
+                    dataset_id,
+                    row["mapfile_checksum"],
+                    row["archive_path"],
+                ):
+                    counts["INVALID_TASK"] += 1
+                    print(f"INVALID ARCHIVE TASK: {row['task_id']}")
+                    continue
 
                 if status in ("SUCCESS", "ALREADY_EXISTS"):
                     updated = conn.execute(
@@ -143,7 +214,10 @@ def import_archive_results(results_file):
                         UPDATE datasets
                         SET archive_status       = 'SUCCESS',
                             archive_completed_at = CURRENT_TIMESTAMP
-                        WHERE dataset_id = ? RETURNING dataset_id
+                        WHERE dataset_id = ?
+                          AND registration_status = 'ACTIVE'
+                          AND publication_status = 'SUCCESS'
+                        RETURNING dataset_id
                         """,
                         [dataset_id],
                     ).fetchone()
@@ -154,8 +228,27 @@ def import_archive_results(results_file):
                     else:
                         counts[status] += 1
 
+                    conn.execute(
+                        """
+                        UPDATE archive_tasks
+                        SET status = ?, completed_at = CURRENT_TIMESTAMP,
+                            error_message = ?
+                        WHERE task_id = ?
+                        """,
+                        [status, row.get("error_message", ""), row["task_id"]],
+                    )
+
                 elif status in ("CONFLICT", "FAILED"):
                     counts[status] += 1
+                    conn.execute(
+                        """
+                        UPDATE archive_tasks
+                        SET status = ?, completed_at = CURRENT_TIMESTAMP,
+                            error_message = ?
+                        WHERE task_id = ?
+                        """,
+                        [status, row.get("error_message", ""), row["task_id"]],
+                    )
                 else:
                     counts["UNKNOWN"] += 1
                     print(f"UNKNOWN STATUS: {dataset_id}: {status}")

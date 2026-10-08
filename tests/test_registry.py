@@ -69,7 +69,7 @@ def test_reregistration_invalidates_statuses_when_mapfile_changes(tmp_path):
         """
         UPDATE datasets
         SET publication_status = 'SUCCESS',
-            archive_status = 'ARCHIVED',
+            archive_status = 'SUCCESS',
             archive_completed_at = TIMESTAMP '2025-01-02 03:04:05'
         WHERE dataset_id = ?
         """,
@@ -135,7 +135,7 @@ def test_reregistration_preserves_statuses_when_mapfile_is_unchanged(tmp_path):
     ).fetchone()[:2] == ("SUCCESS", "SUCCESS")
 
 
-def test_reconciliation_removes_stale_inventory_but_keeps_attempts(tmp_path):
+def test_reconciliation_retires_stale_inventory_and_keeps_history(tmp_path):
     conn = make_database(tmp_path / "reconcile.duckdb")
     for dataset_id in ("current", "stale"):
         conn.execute(
@@ -157,13 +157,13 @@ def test_reconciliation_removes_stale_inventory_but_keeps_attempts(tmp_path):
 
     result = reconcile_campaign_datasets(conn, "campaign", {"current"})
 
-    assert result == {"current": 1, "removed": 1}
-    assert conn.execute("SELECT dataset_id FROM datasets").fetchall() == [
-        ("current",)
-    ]
-    assert conn.execute("SELECT dataset_id FROM files").fetchall() == [
-        ("current",)
-    ]
+    assert result == {"current": 1, "retired": 1}
+    assert conn.execute(
+        "SELECT dataset_id, registration_status FROM datasets ORDER BY dataset_id"
+    ).fetchall() == [("current", "ACTIVE"), ("stale", "RETIRED")]
+    assert conn.execute(
+        "SELECT dataset_id FROM files ORDER BY dataset_id"
+    ).fetchall() == [("current",), ("stale",)]
     assert conn.execute(
         "SELECT dataset_id, run_id FROM publication_attempts"
     ).fetchall() == [("stale", "historic-run")]
@@ -226,7 +226,7 @@ def test_cli_skips_cleanup_after_failure_and_fallback_is_transactional(
     assert "Failed:         1" in result.output
     assert "Skipping stale dataset cleanup" in result.output
     assert "Current:        1 datasets" in result.output
-    assert "Stale removed:  0 datasets" in result.output
+    assert "Stale retired:  0 datasets" in result.output
     conn = duckdb.connect(str(database_path))
     assert set(conn.execute("SELECT dataset_id FROM datasets").fetchall()) == {
         ("good",),

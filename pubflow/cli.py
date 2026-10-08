@@ -102,7 +102,7 @@ def dataset_register(
     success = 0
     failed = 0
     current_dataset_ids = set()
-    reconciliation = {"current": 0, "removed": 0}
+    reconciliation = {"current": 0, "retired": 0}
     start_total = time.monotonic()
     with tqdm(
             total=len(mapfiles),
@@ -190,7 +190,7 @@ def dataset_register(
     typer.echo(f"  Succeeded:      {success}")
     typer.echo(f"  Failed:         {failed}")
     typer.echo(f"  Current:        {reconciliation['current']} datasets")
-    typer.echo(f"  Stale removed:  {reconciliation['removed']} datasets")
+    typer.echo(f"  Stale retired:  {reconciliation['retired']} datasets")
     typer.echo(f"  Duration:       {format_duration(elapsed)}")
     typer.echo(f"  Rate:           {rate:.2f} mapfiles/s")
     typer.echo(
@@ -336,6 +336,7 @@ def archive_import(results_file: str):
         typer.echo(f"Conflicts:        {result['CONFLICT']}")
         typer.echo(f"Failed:            {result['FAILED']}")
         typer.echo(f"Unknown datasets: {result['UNKNOWN_DATASET']}")
+        typer.echo(f"Invalid tasks:     {result['INVALID_TASK']}")
         typer.echo(f"Unknown statuses: {result['UNKNOWN']}")
     except Exception as exc:
         typer.echo(f"ERROR: {exc}", err=True)

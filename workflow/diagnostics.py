@@ -79,6 +79,7 @@ def get_failed_datasets(campaign, limit=None):
             SELECT dataset_id, mapfile, publication_status
             FROM datasets
             WHERE campaign = ?
+              AND registration_status = 'ACTIVE'
               AND publication_status = 'FAILED'
             ORDER BY dataset_id
         """

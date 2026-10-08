@@ -19,10 +19,15 @@ CREATE TABLE IF NOT EXISTS datasets
     drs JSON,
     mapfile VARCHAR NOT NULL,
     mapfile_checksum VARCHAR,
-    publication_status VARCHAR NOT NULL DEFAULT 'PENDING',
+    registration_status VARCHAR NOT NULL DEFAULT 'ACTIVE'
+        CHECK (registration_status IN ('ACTIVE', 'RETIRED')),
+    retired_at TIMESTAMP,
+    publication_status VARCHAR NOT NULL DEFAULT 'PENDING'
+        CHECK (publication_status IN ('PENDING', 'SUCCESS', 'FAILED')),
     publication_claim_id VARCHAR,
     publication_claimed_at TIMESTAMP,
-    archive_status VARCHAR NOT NULL DEFAULT 'PENDING',
+    archive_status VARCHAR NOT NULL DEFAULT 'PENDING'
+        CHECK (archive_status IN ('PENDING', 'SUCCESS')),
     archive_completed_at TIMESTAMP,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (campaign) REFERENCES campaigns(name)
@@ -71,4 +76,21 @@ CREATE TABLE IF NOT EXISTS diagnostic_attempts
     server_instance VARCHAR,
     log_file VARCHAR,
     stac_file VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS archive_tasks
+(
+    task_id VARCHAR PRIMARY KEY,
+    dataset_id VARCHAR NOT NULL,
+    campaign VARCHAR NOT NULL,
+    mapfile_checksum VARCHAR NOT NULL,
+    source_mapfile VARCHAR NOT NULL,
+    archive_path VARCHAR NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    status VARCHAR NOT NULL DEFAULT 'PENDING'
+        CHECK (status IN (
+            'PENDING', 'SUCCESS', 'ALREADY_EXISTS', 'CONFLICT', 'FAILED'
+        )),
+    error_message VARCHAR
 );

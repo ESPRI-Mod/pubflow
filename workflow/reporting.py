@@ -28,6 +28,7 @@ def campaign_summary():
                COUNT(*) AS datasets
 
         FROM datasets
+        WHERE registration_status = 'ACTIVE'
 
         GROUP BY campaign
 
@@ -47,6 +48,7 @@ def publication_summary():
                COUNT(*)
 
         FROM datasets
+        WHERE registration_status = 'ACTIVE'
 
         GROUP BY publication_status
 
@@ -70,7 +72,8 @@ def failed_publications():
 
         FROM datasets
 
-        WHERE publication_status != 'PENDING'
+        WHERE registration_status = 'ACTIVE'
+        AND publication_status != 'PENDING'
 
         AND publication_status != 'SUCCESS'
 

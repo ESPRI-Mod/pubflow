@@ -15,13 +15,18 @@ def get_campaign_status_rows():
                                        log_file,
                                        ROW_NUMBER() OVER (
                     PARTITION BY dataset_id
-                    ORDER BY started_at DESC
+                    ORDER BY finished_at DESC NULLS LAST,
+                             started_at DESC NULLS LAST,
+                             attempt_id DESC NULLS LAST
                 ) AS rn
                                 FROM publication_attempts)
 
         SELECT d.dataset_id,
                d.campaign,
-               d.publication_status,
+               CASE
+                   WHEN d.registration_status = 'RETIRED' THEN 'RETIRED'
+                   ELSE d.publication_status
+               END AS publication_status,
                a.last_attempt_status,
                a.finished_at,
                a.log_file
@@ -71,6 +76,8 @@ def get_campaign_summary_rows():
                )        AS pending
 
         FROM datasets
+
+        WHERE registration_status = 'ACTIVE'
 
         GROUP BY campaign
 
@@ -502,6 +509,7 @@ def get_campaign_records():
         FROM datasets d
                  JOIN campaigns c
                       ON d.campaign = c.name
+        WHERE d.registration_status = 'ACTIVE'
         GROUP BY d.campaign,
                  c.project,
                  c.activity,
@@ -530,18 +538,28 @@ def get_dataset_records():
 
     rows = conn.execute(
         """
+        WITH latest_attempt AS (
+            SELECT dataset_id, status, finished_at, log_file,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY dataset_id
+                       ORDER BY finished_at DESC NULLS LAST,
+                                started_at DESC NULLS LAST,
+                                attempt_id DESC NULLS LAST
+                   ) AS rn
+            FROM publication_attempts
+        )
         SELECT d.dataset_id,
                d.campaign,
-               d.publication_status,
+               CASE
+                   WHEN d.registration_status = 'RETIRED' THEN 'RETIRED'
+                   ELSE d.publication_status
+               END AS publication_status,
                p.status AS last_attempt_status,
                p.finished_at,
                p.log_file
         FROM datasets d
-                 LEFT JOIN publication_attempts p
-                           ON d.dataset_id = p.dataset_id
-                               AND p.finished_at = (SELECT MAX(p2.finished_at)
-                                                    FROM publication_attempts p2
-                                                    WHERE p2.dataset_id = d.dataset_id)
+                 LEFT JOIN latest_attempt p
+                           ON d.dataset_id = p.dataset_id AND p.rn = 1
         ORDER BY d.dataset_id
         """
     ).fetchall()
