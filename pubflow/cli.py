@@ -14,6 +14,10 @@ from workflow.exporter import export_campaign_status, sync_to_grist
 from workflow.grist import check_connection, get_table_columns, list_tables
 from workflow.registry import reconcile_campaign_datasets, register_dataset
 from workflow.stac_cleanup import cleanup_stac_items
+from workflow.stac_reconciliation import (
+    reconcile_campaign,
+    write_reconciliation_report,
+)
 from workflow.validator import validate_campaign
 
 app = typer.Typer(
@@ -311,6 +315,11 @@ def archive_generate(
         campaign_name: str,
         limit: int | None = typer.Option(None),
         output: str = typer.Option("archive_tasks.csv"),
+        verify_stac: bool = typer.Option(
+            True,
+            "--verify-stac/--no-verify-stac",
+            help="Confirm every candidate exists in EAST STAC before generation.",
+        ),
 ):
     """Generate archive tasks for successfully published datasets."""
     try:
@@ -318,6 +327,7 @@ def archive_generate(
             campaign_name,
             output=output,
             limit=limit,
+            verify_stac=verify_stac,
         )
         typer.echo(f"Generated {count} archive tasks")
         typer.echo(f"Output: {output}")
@@ -409,6 +419,82 @@ def publication_diagnose(
         typer.echo("  Grist:             synchronized")
     elif result["grist_error"]:
         typer.echo(f"  Grist warning:     {result['grist_error']}")
+
+
+@stac_app.command("reconcile")
+def stac_reconcile(
+        campaign: str | None = typer.Argument(
+            None,
+            help="Campaign to check; omit when using --all-campaigns.",
+        ),
+        all_campaigns: bool = typer.Option(
+            False,
+            "--all-campaigns",
+            help="Check every active dataset in DuckDB.",
+        ),
+        scope: str = typer.Option(
+            "all",
+            help="Datasets to check: all, successful, failed, or pending.",
+        ),
+        limit: int | None = typer.Option(None),
+        concurrency: int = typer.Option(8, min=1),
+        timeout_seconds: int = typer.Option(15, min=1),
+        retries: int = typer.Option(2, min=0),
+        grace_seconds: int = typer.Option(600, min=0),
+        report: Path | None = typer.Option(
+            None,
+            "--report",
+            help="Write actionable drift and API errors to a CSV file.",
+        ),
+):
+    """Compare registered datasets with the EAST STAC API."""
+    try:
+        if all_campaigns == (campaign is not None):
+            raise ValueError(
+                "Provide exactly one campaign or use --all-campaigns"
+            )
+        result = reconcile_campaign(
+            None if all_campaigns else campaign,
+            scope=scope,
+            limit=limit,
+            concurrency=concurrency,
+            timeout_seconds=timeout_seconds,
+            retries=retries,
+            grace_seconds=grace_seconds,
+        )
+    except Exception as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo("STAC reconciliation complete")
+    typer.echo(f"  Run ID:    {result['run_id']}")
+    typer.echo(f"  Selected:  {result['selected']}")
+    for outcome in ("PRESENT", "ABSENT", "MISMATCH", "WAITING", "ERROR"):
+        typer.echo(f"  {outcome.title():<10} {result['counts'].get(outcome, 0)}")
+    if result["comparisons"]:
+        typer.echo("  State comparison:")
+        for comparison, count in sorted(result["comparisons"].items()):
+            typer.echo(f"    {comparison}: {count}")
+    typer.echo("  Classification:")
+    for classification in ("CONSISTENT", "DRIFT", "API_ERROR", "WAITING"):
+        typer.echo(
+            f"    {classification}: "
+            f"{result['classifications'].get(classification, 0)}"
+        )
+    discrepancies = [
+        item for item in result["results"]
+        if item["outcome"] != "PRESENT"
+    ]
+    if discrepancies:
+        typer.echo("  Discrepancies:")
+        for item in discrepancies[:20]:
+            typer.echo(
+                f"    {item['outcome']}: {item['dataset_id']}"
+                + (f" — {item['error_message']}" if item["error_message"] else "")
+            )
+    if report is not None:
+        report_count = write_reconciliation_report(result, report)
+        typer.echo(f"  Report: {report} ({report_count} actionable rows)")
 
 
 @stac_app.command("clean")

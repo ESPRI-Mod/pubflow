@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import csv
 import hashlib
+from collections import Counter
 from pathlib import Path
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from esgvoc.apps.drs.generator import DrsGenerator
 from workflow.campaign import get_campaign
 from workflow.database import connect
 from workflow.registry import parse_drs
+from workflow.stac_reconciliation import reconcile_campaign
 
 
 def get_archivable_datasets(campaign, limit=None):
@@ -84,9 +86,39 @@ def get_archive_path(dataset_id, mapfile, campaign):
     return archive_root / Path(*selected) / ".mapfiles" / Path(mapfile).name
 
 
-def generate_archive_tasks(campaign_name, output, limit=None):
+def generate_archive_tasks(
+        campaign_name,
+        output,
+        limit=None,
+        verify_stac=True,
+):
     campaign = get_campaign(campaign_name)
     rows = get_archivable_datasets(campaign_name, limit)
+
+    if verify_stac and rows:
+        reconciliation = reconcile_campaign(
+            campaign_name,
+            scope="successful",
+            dataset_ids=[row[0] for row in rows],
+        )
+        blocked = [
+            result
+            for result in reconciliation["results"]
+            if result["outcome"] != "PRESENT"
+        ]
+        if blocked:
+            counts = Counter(result["outcome"] for result in blocked)
+            details = ", ".join(
+                f"{outcome}={count}"
+                for outcome, count in sorted(counts.items())
+            )
+            examples = ", ".join(
+                result["dataset_id"] for result in blocked[:5]
+            )
+            raise ValueError(
+                "Archive generation blocked by STAC reconciliation "
+                f"({details}). Example datasets: {examples}"
+            )
 
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)

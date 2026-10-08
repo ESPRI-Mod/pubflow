@@ -61,6 +61,22 @@ def _ensure_compatible_schema(conn):
             "UPDATE datasets SET archive_status = 'PENDING' "
             "WHERE archive_status IS NULL"
         )
+        conn.execute(
+            "ALTER TABLE datasets ADD COLUMN IF NOT EXISTS "
+            "stac_status VARCHAR DEFAULT 'UNCHECKED'"
+        )
+        conn.execute(
+            "UPDATE datasets SET stac_status = 'UNCHECKED' "
+            "WHERE stac_status IS NULL"
+        )
+        conn.execute(
+            "ALTER TABLE datasets ADD COLUMN IF NOT EXISTS "
+            "stac_checked_at TIMESTAMP"
+        )
+        conn.execute(
+            "ALTER TABLE datasets ADD COLUMN IF NOT EXISTS "
+            "stac_http_status INTEGER"
+        )
         invalid_dataset_states = conn.execute(
             """
             SELECT dataset_id, registration_status,
@@ -69,6 +85,10 @@ def _ensure_compatible_schema(conn):
             WHERE registration_status NOT IN ('ACTIVE', 'RETIRED')
                OR publication_status NOT IN ('PENDING', 'SUCCESS', 'FAILED')
                OR archive_status NOT IN ('PENDING', 'SUCCESS')
+               OR stac_status NOT IN (
+                    'UNCHECKED', 'WAITING', 'PRESENT', 'ABSENT',
+                    'MISMATCH', 'ERROR'
+               )
             LIMIT 5
             """
         ).fetchall()
@@ -120,6 +140,29 @@ def _ensure_compatible_schema(conn):
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stac_reconciliation_attempts
+            (
+                check_id VARCHAR PRIMARY KEY,
+                run_id VARCHAR NOT NULL,
+                dataset_id VARCHAR NOT NULL,
+                campaign VARCHAR NOT NULL,
+                collection_id VARCHAR NOT NULL,
+                item_id VARCHAR NOT NULL,
+                request_url VARCHAR NOT NULL,
+                started_at TIMESTAMP NOT NULL,
+                finished_at TIMESTAMP NOT NULL,
+                outcome VARCHAR NOT NULL,
+                publication_status VARCHAR NOT NULL,
+                http_status INTEGER,
+                response_item_id VARCHAR,
+                response_collection VARCHAR,
+                response_hash VARCHAR,
+                error_message VARCHAR
+            )
+            """
+        )
     return "datasets" in tables and "publication_attempts" in tables
 
 
@@ -160,7 +203,10 @@ def update_dataset_status(
 
         SET publication_status = ?,
             publication_claim_id = NULL,
-            publication_claimed_at = NULL
+            publication_claimed_at = NULL,
+            stac_status = 'UNCHECKED',
+            stac_checked_at = NULL,
+            stac_http_status = NULL
 
         WHERE dataset_id = ?
         """,

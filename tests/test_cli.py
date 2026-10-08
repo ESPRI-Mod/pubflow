@@ -36,6 +36,39 @@ def test_publication_help_lists_actions():
     assert "diagnose" in result.stdout
 
 
+def test_stac_help_lists_reconciliation():
+    result = runner.invoke(app, ["stac", "--help"])
+
+    assert result.exit_code == 0
+    assert "reconcile" in result.stdout
+
+
+def test_stac_reconcile_requires_campaign_or_all_campaigns():
+    result = runner.invoke(app, ["stac", "reconcile"])
+
+    assert result.exit_code == 1
+    assert "exactly one campaign" in result.output
+
+
+def test_stac_reconcile_accepts_all_campaigns():
+    reconciliation = {
+        "run_id": "run",
+        "selected": 0,
+        "counts": {},
+        "comparisons": {},
+        "classifications": {},
+        "results": [],
+    }
+    with patch(
+        "pubflow.cli.reconcile_campaign",
+        return_value=reconciliation,
+    ) as reconcile:
+        result = runner.invoke(app, ["stac", "reconcile", "--all-campaigns"])
+
+    assert result.exit_code == 0, result.output
+    assert reconcile.call_args.args[0] is None
+
+
 def test_version_is_0_2_0():
     result = runner.invoke(app, ["version"])
 

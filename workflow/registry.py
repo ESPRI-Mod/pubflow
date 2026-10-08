@@ -167,6 +167,24 @@ def register_dataset(
                 THEN datasets.archive_completed_at
                 ELSE NULL
             END,
+            stac_status = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.stac_status
+                ELSE 'UNCHECKED'
+            END,
+            stac_checked_at = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.stac_checked_at
+                ELSE NULL
+            END,
+            stac_http_status = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.stac_http_status
+                ELSE NULL
+            END,
             mapfile_checksum = EXCLUDED.mapfile_checksum
         """,
         [

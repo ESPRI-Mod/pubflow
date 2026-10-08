@@ -132,6 +132,8 @@ pubflow --help
 
 | `pubflow stac clean` | Preview or remove publisher-generated STAC JSON dumps |
 
+| `pubflow stac reconcile` | Compare DuckDB publication state with EAST STAC |
+
 | `pubflow dataset validate` | Validate registered datasets |
 
 | `pubflow report export` | Export database state to CSV |
@@ -710,6 +712,53 @@ pubflow stac clean \
 Cleanup is limited to the selected directory and does not recurse into
 subdirectories.
 
+### EAST STAC Reconciliation
+
+Reconciliation checks active DuckDB datasets directly against the EAST STAC
+Item endpoint:
+
+```bash
+
+pubflow stac reconcile tipmip-cnrm
+
+```
+
+The default scope checks successful, failed, and pending datasets. Narrow it
+when investigating a particular state:
+
+```bash
+
+pubflow stac reconcile tipmip-cnrm --scope successful --limit 100
+
+```
+
+Check every active dataset in DuckDB and write an actionable CSV report:
+
+```bash
+
+pubflow stac reconcile --all-campaigns \
+    --report stac_reconciliation_report.csv
+
+```
+
+Exactly one campaign or `--all-campaigns` is required. The report contains
+state drift such as `SUCCESS/ABSENT`, `FAILED/PRESENT`, `PENDING/PRESENT`, and
+identity mismatches, plus API errors that require a retry or investigation.
+Consistent results and grace-period `WAITING` rows are omitted. Each row retains
+the campaign, expected collection and item IDs, HTTP status, request URL,
+timestamp, and error detail so it can be assigned or attached to an incident.
+
+Each lookup is classified as `PRESENT`, `ABSENT`, `MISMATCH`, `ERROR`, or
+`WAITING`. A recent successful publication remains `WAITING` during the default
+ten-minute ingestion grace period. HTTP failures and malformed responses are
+never interpreted as absence. Results are appended to
+`stac_reconciliation_attempts`, and the latest result is stored on the dataset
+row without changing `publication_status`.
+
+The EAST endpoint is currently fixed at `https://search.east.esgf.io`. Useful
+execution controls include `--concurrency`, `--timeout-seconds`, `--retries`,
+and `--grace-seconds`.
+
 The installed EAST publisher must support saving STAC from its EGI transaction
 client. Detailed transaction service output remains useful for authorization,
 conflict, and other server-only failures, but it is no longer required for
@@ -975,6 +1024,11 @@ archive_status = PENDING
 pubflow archive generate tipmip-cnrm
 
 ```
+
+Archive generation performs a fresh EAST STAC reconciliation for every
+candidate and fails without writing a task file unless all candidates are
+`PRESENT`. The explicit `--no-verify-stac` option is reserved for operational
+recovery when the EAST service is unavailable and its use should be documented.
 
 Use a limit for testing:
 
