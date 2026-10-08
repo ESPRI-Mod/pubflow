@@ -253,6 +253,8 @@ publisher:
 
     no_status_retries: 0
 
+    claim_timeout_seconds: 3600
+
   logging:
 
     directory: logs
@@ -465,6 +467,21 @@ Completed: 2445 succeeded, 1 failed
 
 Registration is therefore safe to run before a publication campaign begins.
 
+Registration treats a non-empty, successfully parsed mapfile scan as the
+authoritative campaign inventory. If the scan is unexpectedly empty, stale
+dataset cleanup is skipped by default. Removing the complete registered
+inventory requires explicit confirmation:
+
+```bash
+
+pubflow dataset register tipmip-cnrm --allow-empty-reconciliation
+
+```
+
+Pubflow stores a SHA-256 fingerprint for each mapfile. Re-registering unchanged
+content preserves publication and archive state; changed content is reset to
+`PENDING` so it cannot remain falsely marked as published or archived.
+
 ---
 
 ## Publishing
@@ -511,6 +528,12 @@ of the current run. It is not immediately published a second time by default.
 Publication continues with the unreached datasets from an in-memory work queue,
 without repeatedly scanning the pending table or building a growing SQL
 exclusion list.
+
+Before invoking `esgpublish`, Pubflow atomically claims the selected datasets
+and persists `RUNNING` publication attempts with unique IDs. Concurrent runs
+therefore cannot select the same dataset. Claims older than
+`claim_timeout_seconds` are recovered on the next run, and their unfinished
+attempts are recorded as `ABANDONED`.
 
 Each publisher invocation has a default 600-second timeout. A timeout is
 recorded as `TIMEOUT`, while the dataset remains `PENDING`. Both settings can

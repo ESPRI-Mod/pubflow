@@ -79,6 +79,14 @@ def dataset_register(
             100,
             help="Mapfiles per database transaction.",
         ),
+        allow_empty_reconciliation: bool = typer.Option(
+            False,
+            "--allow-empty-reconciliation",
+            help=(
+                "Allow an empty mapfile scan to remove every registered "
+                "dataset in the campaign."
+            ),
+        ),
 ):
     """Register all mapfiles belonging to a campaign."""
     campaign = get_campaign(campaign_name)
@@ -155,6 +163,12 @@ def dataset_register(
             "occurred."
         )
         reconciliation["current"] = len(current_dataset_ids)
+    elif not mapfiles and not allow_empty_reconciliation:
+        typer.echo(
+            "Skipping stale dataset cleanup because the authoritative "
+            "mapfile scan was empty. Use --allow-empty-reconciliation "
+            "to confirm removal of the entire campaign inventory."
+        )
     else:
         conn.execute("BEGIN")
         try:
@@ -208,14 +222,14 @@ def publication_run(
                 campaign,
                 limit=limit,
                 batch_size=batch_size,
-                timeout_seconds=timeout_seconds,
-                no_status_retries=no_status_retries,
             )
         else:
             publish_campaign(
                 campaign,
                 limit=limit,
                 batch_size=batch_size,
+                timeout_seconds=timeout_seconds,
+                no_status_retries=no_status_retries,
             )
 
     except ValueError as exc:
@@ -446,9 +460,18 @@ def legacy_register(
         campaign_name: str,
         register_files: bool = typer.Option(False, "--register-files"),
         batch_size: int = typer.Option(100, "--batch-size"),
+        allow_empty_reconciliation: bool = typer.Option(
+            False,
+            "--allow-empty-reconciliation",
+        ),
 ):
     warn_deprecated("pubflow register", "pubflow dataset register")
-    return dataset_register(campaign_name, register_files, batch_size)
+    return dataset_register(
+        campaign_name,
+        register_files,
+        batch_size,
+        allow_empty_reconciliation,
+    )
 
 
 @app.command("validate", hidden=True)

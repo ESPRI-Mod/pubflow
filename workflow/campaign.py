@@ -22,20 +22,22 @@ def load_campaigns():
     with open(get_campaigns_file()) as f:
         config = yaml.safe_load(f)
     conn = connect()
-    for name, campaign in config["campaigns"].items():
-        mapfile_root = Path(os.path.expandvars(
-            str(campaign["mapfile_root"])
-        )).expanduser()
-        if not mapfile_root.is_absolute():
-            mapfile_root = PROJECT_ROOT / mapfile_root
-        mapfile_root = mapfile_root.resolve()
-        archive = campaign.get("archive", {})
-        archive_root = None
-        archive_depth = None
-        if archive.get("enabled", False):
-            archive_root = archive.get("root")
-            archive_depth = archive.get("depth")
-        conn.execute(
+    try:
+        conn.execute("BEGIN")
+        for name, campaign in config["campaigns"].items():
+            mapfile_root = Path(os.path.expandvars(
+                str(campaign["mapfile_root"])
+            )).expanduser()
+            if not mapfile_root.is_absolute():
+                mapfile_root = PROJECT_ROOT / mapfile_root
+            mapfile_root = mapfile_root.resolve()
+            archive = campaign.get("archive", {})
+            archive_root = None
+            archive_depth = None
+            if archive.get("enabled", False):
+                archive_root = archive.get("root")
+                archive_depth = archive.get("depth")
+            conn.execute(
             """
             INSERT OR REPLACE INTO campaigns
             (
@@ -50,22 +52,24 @@ def load_campaigns():
 
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            [
-                name,
-                campaign["project"],
-                campaign["activity"],
-                campaign["institution"],
-                str(mapfile_root),
-                archive_root,
-                archive_depth
-            ],
-        )
+                [
+                    name,
+                    campaign["project"],
+                    campaign["activity"],
+                    campaign["institution"],
+                    str(mapfile_root),
+                    archive_root,
+                    archive_depth
+                ],
+            )
 
-        print(
-            f"Loaded campaign: {name}"
-        )
-
-    conn.close()
+            print(f"Loaded campaign: {name}")
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
 
 
 def get_campaign(name):

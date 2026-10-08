@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS datasets
     institution VARCHAR NOT NULL,
     drs JSON,
     mapfile VARCHAR NOT NULL,
+    mapfile_checksum VARCHAR,
     publication_status VARCHAR NOT NULL DEFAULT 'PENDING',
+    publication_claim_id VARCHAR,
+    publication_claimed_at TIMESTAMP,
     archive_status VARCHAR NOT NULL DEFAULT 'PENDING',
     archive_completed_at TIMESTAMP,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -37,6 +40,7 @@ CREATE TABLE IF NOT EXISTS files
 
 CREATE TABLE IF NOT EXISTS publication_attempts
 (
+    attempt_id VARCHAR PRIMARY KEY DEFAULT (uuid()::VARCHAR),
     dataset_id VARCHAR,
     run_id VARCHAR,
     started_at TIMESTAMP,

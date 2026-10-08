@@ -61,6 +61,11 @@ def validate_files(mapfile):
                 x.strip()
                 for x in line.split("|")
             ]
+            if len(fields) < 3:
+                failures.append(
+                    f"Line {line_number}: malformed mapfile row"
+                )
+                continue
             filepath = fields[1]
             if not Path(filepath).exists():
                 failures.append(
@@ -94,15 +99,15 @@ def validate_dataset(dataset_id, mapfile):
 
 def validate_campaign(campaign, limit=None):
     campaign_config = get_campaign(campaign)
-    datasets = get_pending_datasets(campaign_config["name"],limit)
+    datasets = get_pending_datasets(campaign_config["name"], limit)
     print()
-    print(f"Campaign: {campaign_config["name"]}")
+    print(f"Campaign: {campaign_config['name']}")
     print(f"Datasets checked: {len(datasets)}")
     print()
     passed = 0
     failed = 0
     for dataset_id, mapfile in datasets:
-        ok, errors = validate_dataset(dataset_id,mapfile)
+        ok, errors = validate_dataset(dataset_id, mapfile)
         if ok:
             passed += 1
             print(f"PASS {dataset_id}")

@@ -170,6 +170,9 @@ def _run_one(dataset, campaign, run_id, run_dir, persist_stac_item):
         valid=None,
         error="publisher did not generate a STAC item",
     )
+    timeout_seconds = get_publisher_config().get(
+        "execution", {}
+    ).get("timeout_seconds", 600)
 
     try:
         with tempfile.TemporaryDirectory(prefix="pubflow-diagnostic-") as temp_dir:
@@ -188,6 +191,7 @@ def _run_one(dataset, campaign, run_id, run_dir, persist_stac_item):
                 stderr=subprocess.STDOUT,
                 text=True,
                 check=False,
+                timeout=timeout_seconds,
             )
             exit_code = completed.returncode
             output = completed.stdout or ""

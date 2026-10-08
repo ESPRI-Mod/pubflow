@@ -48,7 +48,7 @@ def get_campaign_summary_rows():
 
                SUM(
                        CASE
-                           WHEN publication_status = 'PUBLISHED'
+                           WHEN publication_status = 'SUCCESS'
                                THEN 1
                            ELSE 0
                            END

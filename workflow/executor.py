@@ -4,9 +4,15 @@ import sys
 from collections import deque
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 from workflow.config import get_publisher_config, get_active_esg_config
-from workflow.database import connect, update_dataset_status, retry_failed_datasets
+from workflow.database import (
+    clear_dataset_claim,
+    connect,
+    retry_failed_datasets,
+    update_dataset_status,
+)
 from workflow.result import PublicationResult
 from workflow.summary import PublicationSummary
 from workflow.publisher_output import parse_publication_statuses
@@ -15,7 +21,7 @@ from workflow.stac_items import reconcile_stac_item
 
 def create_run_id(campaign):
     timestamp = datetime.today().strftime("%Y%m%d%H%M%S")
-    return f"{campaign}_{timestamp}"
+    return f"{campaign}_{timestamp}_{uuid4().hex[:12]}"
 
 
 def get_run_log_file(campaign, run_id):
@@ -36,8 +42,48 @@ def get_campaign_datasets(
         campaign,
         limit=None,
         exclude_dataset_ids=None,
+        claim_id=None,
+        claim_timeout_seconds=3600,
 ):
     conn = connect()
+    if claim_id is not None:
+        cutoff = datetime.now().timestamp() - claim_timeout_seconds
+        cutoff_time = datetime.fromtimestamp(cutoff)
+        conn.execute("BEGIN")
+        expired_claims = conn.execute(
+            """
+            SELECT dataset_id, publication_claim_id
+            FROM datasets
+            WHERE campaign = ?
+              AND publication_status = 'PENDING'
+              AND publication_claimed_at < ?
+            """,
+            [campaign, cutoff_time],
+        ).fetchall()
+        for dataset_id, expired_claim_id in expired_claims:
+            conn.execute(
+                """
+                UPDATE publication_attempts
+                SET finished_at = CURRENT_TIMESTAMP,
+                    status = 'ABANDONED',
+                    error_message = 'Publication claim lease expired'
+                WHERE dataset_id = ?
+                  AND run_id = ?
+                  AND status = 'RUNNING'
+                """,
+                [dataset_id, expired_claim_id],
+            )
+        conn.execute(
+            """
+            UPDATE datasets
+            SET publication_claim_id = NULL,
+                publication_claimed_at = NULL
+            WHERE campaign = ?
+              AND publication_status = 'PENDING'
+              AND publication_claimed_at < ?
+            """,
+            [campaign, cutoff_time],
+        )
     query = """
             SELECT dataset_id,
                    mapfile,
@@ -45,6 +91,7 @@ def get_campaign_datasets(
             FROM datasets
             WHERE campaign = ?
               AND publication_status = 'PENDING'
+              AND publication_claim_id IS NULL
             """
 
     params = [campaign]
@@ -65,6 +112,26 @@ def get_campaign_datasets(
         query,
         params,
     ).fetchall()
+
+    if claim_id is not None:
+        claimed_rows = []
+        for dataset_id, mapfile, status in rows:
+            claimed = conn.execute(
+                """
+                UPDATE datasets
+                SET publication_claim_id = ?,
+                    publication_claimed_at = CURRENT_TIMESTAMP
+                WHERE dataset_id = ?
+                  AND publication_status = 'PENDING'
+                  AND publication_claim_id IS NULL
+                RETURNING dataset_id
+                """,
+                [claim_id, dataset_id],
+            ).fetchone()
+            if claimed is not None:
+                claimed_rows.append((dataset_id, mapfile, status))
+        rows = claimed_rows
+        conn.execute("COMMIT")
 
     conn.close()
 
@@ -147,26 +214,31 @@ def build_publish_command(mapfile, save_stac=False):
 
 
 def create_attempt(conn, dataset_id, run_id,):
+    attempt_id = str(uuid4())
     conn.execute(
         """
         INSERT INTO publication_attempts
-        (dataset_id,
+        (attempt_id,
+         dataset_id,
          run_id,
          started_at,
          status)
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
         """,
         [
+            attempt_id,
             dataset_id,
             run_id,
             datetime.now(),
             "RUNNING",
         ],
     )
+    return attempt_id
 
 
 def finish_attempt(
         conn,
+        attempt_id,
         dataset_id,
         run_id,
         status,
@@ -184,8 +256,7 @@ def finish_attempt(
             log_file      = ?,
             error_message = ?
 
-        WHERE dataset_id = ?
-          AND run_id = ?
+        WHERE attempt_id = ?
         """,
         [
             datetime.now(),
@@ -193,8 +264,7 @@ def finish_attempt(
             exit_code,
             log_file,
             error_message,
-            dataset_id,
-            run_id,
+            attempt_id,
         ],
     )
 
@@ -207,11 +277,14 @@ def record_publication_result(
         exit_code,
         log_file,
         error_message=None,
+        attempt_id=None,
 ):
-    create_attempt(conn, dataset_id, run_id)
+    if attempt_id is None:
+        attempt_id = create_attempt(conn, dataset_id, run_id)
     update_dataset_status(conn, dataset_id, status)
     finish_attempt(
         conn,
+        attempt_id,
         dataset_id,
         run_id,
         status,
@@ -249,11 +322,15 @@ def record_incomplete_attempt(
         exit_code,
         log_file,
         error_message,
+        attempt_id=None,
 ):
     """Record an incomplete attempt without changing the dataset status."""
-    create_attempt(conn, dataset_id, run_id)
+    if attempt_id is None:
+        attempt_id = create_attempt(conn, dataset_id, run_id)
+    clear_dataset_claim(conn, dataset_id, claim_id=run_id)
     finish_attempt(
         conn,
+        attempt_id,
         dataset_id,
         run_id,
         status,
@@ -370,6 +447,7 @@ def publish_batch(
 ):
     conn = connect()
     results = []
+    attempt_ids = {}
     try:
         with tempfile.TemporaryDirectory(
                 prefix="pubflow-"
@@ -412,6 +490,12 @@ def publish_batch(
                         error_message=error_message,
                     ))
 
+            for dataset_id, _, _ in staged_datasets:
+                attempt_ids[dataset_id] = create_attempt(
+                    conn,
+                    dataset_id,
+                    run_id,
+                )
             conn.commit()
 
             if not staged_datasets:
@@ -508,11 +592,23 @@ def publish_batch(
                     return_code,
                     log_file,
                     no_status_error,
+                    attempt_id=attempt_ids[dataset_id],
                 )
                 with open(log_file, "a") as log:
                     log.write(
                         f"DEFERRED {dataset_id} ({attempt_status}): "
                         f"{no_status_error}\n"
+                    )
+                for unreached_id, _, _ in staged_datasets[1:]:
+                    finish_attempt(
+                        conn,
+                        attempt_ids[unreached_id],
+                        unreached_id,
+                        run_id,
+                        "UNREACHED",
+                        return_code,
+                        str(log_file),
+                        "Publisher emitted no status for this dataset",
                     )
                 conn.commit()
                 return []
@@ -544,6 +640,7 @@ def publish_batch(
                     return_code,
                     log_file,
                     dataset_error,
+                    attempt_id=attempt_ids[dataset_id],
                 )
                 results.append(PublicationResult(
                     dataset_id=dataset_id,
@@ -553,6 +650,20 @@ def publish_batch(
                     error_message=dataset_error,
                 ))
 
+            completed_ids = set(statuses)
+            for dataset_id, _, _ in staged_datasets:
+                if dataset_id in completed_ids:
+                    continue
+                finish_attempt(
+                    conn,
+                    attempt_ids[dataset_id],
+                    dataset_id,
+                    run_id,
+                    "UNREACHED",
+                    return_code,
+                    str(log_file),
+                    "Publisher emitted no status for this dataset",
+                )
             conn.commit()
             return results
     except Exception as exc:
@@ -571,6 +682,7 @@ def publish_batch(
                 -1,
                 log_file,
                 error_message,
+                attempt_id=attempt_ids.get(dataset_id),
             )
             results.append(PublicationResult(
                 dataset_id=dataset_id,
@@ -621,10 +733,13 @@ def publish_campaign(
         timeout_seconds = execution.get("timeout_seconds", 600)
     if no_status_retries is None:
         no_status_retries = execution.get("no_status_retries", 0)
+    claim_timeout_seconds = execution.get("claim_timeout_seconds", 3600)
     if timeout_seconds is not None and timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be greater than zero")
     if no_status_retries < 0:
         raise ValueError("no_status_retries cannot be negative")
+    if claim_timeout_seconds <= 0:
+        raise ValueError("claim_timeout_seconds must be greater than zero")
 
     run_id = create_run_id(campaign)
 
@@ -672,7 +787,12 @@ def publish_campaign(
     total_processed = 0
     batch_number = 0
     deferred_dataset_ids = set()
-    selected_datasets = get_campaign_datasets(campaign, limit=limit)
+    selected_datasets = get_campaign_datasets(
+        campaign,
+        limit=limit,
+        claim_id=run_id,
+        claim_timeout_seconds=claim_timeout_seconds,
+    )
     work_queue = deque(selected_datasets)
 
     while work_queue:

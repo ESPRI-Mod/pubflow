@@ -9,12 +9,49 @@ from unittest.mock import patch
 import duckdb
 
 import workflow.database as database
-from workflow.executor import publish_batch
+from workflow.executor import get_campaign_datasets, publish_batch
 from workflow.executor import publish_campaign, record_no_status_attempt
 from workflow.result import PublicationResult
 
 
 class NoStatusHandlingTests(unittest.TestCase):
+    def test_campaign_selection_claims_pending_datasets_atomically(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "publications.duckdb"
+            schema = (
+                Path(__file__).resolve().parents[1] / "db" / "schema.sql"
+            ).read_text()
+            conn = duckdb.connect(str(database_path))
+            conn.execute(schema)
+            conn.execute(
+                """
+                INSERT INTO campaigns
+                (name, project, activity, institution, mapfile_root)
+                VALUES ('test', 'CMIP6', 'CMIP', 'IPSL', '/maps')
+                """
+            )
+            for dataset_id in ("dataset-a", "dataset-b"):
+                conn.execute(
+                    """
+                    INSERT INTO datasets
+                    (dataset_id, campaign, project, activity, institution, mapfile)
+                    VALUES (?, 'test', 'CMIP6', 'CMIP', 'IPSL', ?)
+                    """,
+                    [dataset_id, f"/maps/{dataset_id}.map"],
+                )
+            conn.close()
+
+            previous_database_path = database.DB_PATH
+            database.DB_PATH = database_path
+            try:
+                first = get_campaign_datasets("test", claim_id="run-1")
+                second = get_campaign_datasets("test", claim_id="run-2")
+            finally:
+                database.DB_PATH = previous_database_path
+
+        self.assertEqual(len(first), 2)
+        self.assertEqual(second, [])
+
     def test_none_stdout_is_recorded_and_dataset_remains_pending(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -267,14 +304,15 @@ class NoStatusHandlingTests(unittest.TestCase):
                 "WHERE dataset_id = 'dataset-a'"
             ).fetchone()[0]
             attempt = conn.execute(
-                "SELECT status, exit_code FROM publication_attempts "
+                "SELECT status, exit_code, attempt_id FROM publication_attempts "
                 "WHERE dataset_id = 'dataset-a'"
             ).fetchone()
             conn.close()
 
         self.assertEqual(results, [])
         self.assertEqual(dataset_status, "PENDING")
-        self.assertEqual(attempt, ("TIMEOUT", 124))
+        self.assertEqual(attempt[:2], ("TIMEOUT", 124))
+        self.assertTrue(attempt[2])
 
 
 if __name__ == "__main__":

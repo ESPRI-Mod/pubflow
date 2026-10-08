@@ -8,6 +8,7 @@ publisher:
     dry_run: false
     timeout_seconds: 600
     no_status_retries: 0
+    claim_timeout_seconds: 3600
   logging:
     directory: logs
   stac_items:

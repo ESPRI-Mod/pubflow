@@ -1,8 +1,6 @@
 import json
+import hashlib
 from pathlib import Path
-
-from esgvoc.apps.drs.generator import DrsGenerator
-
 
 def parse_drs(dataset_id, generator):
     """Parse a dataset ID using an ESGVOC DRS generator."""
@@ -114,6 +112,7 @@ def register_dataset(
         include_files=register_files,
     )
     drs = parse_drs(dataset_id, drs_generator)
+    mapfile_checksum = hashlib.sha256(Path(mapfile).read_bytes()).hexdigest()
 
     conn.execute(
         """
@@ -125,16 +124,48 @@ def register_dataset(
             activity,
             institution,
             drs,
-            mapfile
+            mapfile,
+            mapfile_checksum
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (dataset_id) DO UPDATE SET
             campaign = EXCLUDED.campaign,
             project = EXCLUDED.project,
             activity = EXCLUDED.activity,
             institution = EXCLUDED.institution,
             drs = EXCLUDED.drs,
-            mapfile = EXCLUDED.mapfile
+            mapfile = EXCLUDED.mapfile,
+            publication_status = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.publication_status
+                ELSE 'PENDING'
+            END,
+            publication_claim_id = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.publication_claim_id
+                ELSE NULL
+            END,
+            publication_claimed_at = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.publication_claimed_at
+                ELSE NULL
+            END,
+            archive_status = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.archive_status
+                ELSE 'PENDING'
+            END,
+            archive_completed_at = CASE
+                WHEN datasets.mapfile_checksum IS NULL
+                  OR datasets.mapfile_checksum = EXCLUDED.mapfile_checksum
+                THEN datasets.archive_completed_at
+                ELSE NULL
+            END,
+            mapfile_checksum = EXCLUDED.mapfile_checksum
         """,
         [
             dataset_id,
@@ -144,6 +175,7 @@ def register_dataset(
             campaign["institution"],
             json.dumps(drs),
             str(mapfile),
+            mapfile_checksum,
         ],
     )
 

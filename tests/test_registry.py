@@ -49,7 +49,7 @@ def write_mapfile(path, dataset_id, files):
     path.write_text("\n".join(lines) + "\n")
 
 
-def test_reregistration_updates_metadata_and_preserves_statuses(tmp_path):
+def test_reregistration_invalidates_statuses_when_mapfile_changes(tmp_path):
     conn = make_database(tmp_path / "registry.duckdb")
     dataset_id = "P.A.I.S.E.M.T.V.G.v1"
     old_mapfile = tmp_path / "old.map"
@@ -96,14 +96,43 @@ def test_reregistration_updates_metadata_and_preserves_statuses(tmp_path):
     assert row[:3] == ("NEW", "new", "new")
     assert json.loads(row[3])["project"] == "P"
     assert row[4] == str(new_mapfile)
-    assert row[5:] == (
-        "SUCCESS",
-        "ARCHIVED",
-        conn.execute("SELECT TIMESTAMP '2025-01-02 03:04:05'").fetchone()[0],
-    )
+    assert row[5:] == ("PENDING", "PENDING", None)
     assert conn.execute(
         "SELECT file_path, file_size, checksum, mod_time FROM files"
     ).fetchall() == [("new.nc", 2, "new", "new")]
+
+
+def test_reregistration_preserves_statuses_when_mapfile_is_unchanged(tmp_path):
+    conn = make_database(tmp_path / "registry-unchanged.duckdb")
+    dataset_id = "P.A.I.S.E.M.T.V.G.v1"
+    mapfile = tmp_path / "dataset.map"
+    write_mapfile(mapfile, dataset_id, [("file.nc", 1, "sum", "time")])
+
+    for _ in range(2):
+        register_dataset(
+            conn,
+            "campaign",
+            {"project": "P", "activity": "A", "institution": "I"},
+            mapfile,
+            make_generator(),
+            register_files=True,
+        )
+        conn.execute(
+            """
+            UPDATE datasets
+            SET publication_status = 'SUCCESS', archive_status = 'SUCCESS'
+            WHERE dataset_id = ?
+            """,
+            [dataset_id],
+        )
+
+    assert conn.execute(
+        """
+        SELECT publication_status, archive_status, mapfile_checksum
+        FROM datasets WHERE dataset_id = ?
+        """,
+        [dataset_id],
+    ).fetchone()[:2] == ("SUCCESS", "SUCCESS")
 
 
 def test_reconciliation_removes_stale_inventory_but_keeps_attempts(tmp_path):
@@ -203,3 +232,46 @@ def test_cli_skips_cleanup_after_failure_and_fallback_is_transactional(
         ("good",),
         ("stale",),
     }
+
+
+def test_cli_refuses_empty_inventory_reconciliation_by_default(
+        tmp_path,
+        monkeypatch,
+):
+    database_path = tmp_path / "cli-empty.duckdb"
+    mapfile_root = tmp_path / "mapfiles"
+    mapfile_root.mkdir()
+    conn = make_database(database_path)
+    conn.execute(
+        """
+        INSERT INTO datasets
+            (dataset_id, campaign, project, activity, institution, mapfile)
+        VALUES ('existing', 'campaign', 'P', 'A', 'I', 'existing.map')
+        """
+    )
+    conn.close()
+
+    monkeypatch.setattr(
+        cli,
+        "get_campaign",
+        lambda name: {
+            "project": "PROJECT",
+            "activity": "activity",
+            "institution": "institution",
+            "mapfile_root": str(mapfile_root),
+        },
+    )
+    monkeypatch.setattr(cli, "DrsGenerator", lambda project: object())
+    monkeypatch.setattr(cli, "connect", lambda: duckdb.connect(str(database_path)))
+
+    result = runner.invoke(
+        cli.app,
+        ["dataset", "register", "campaign"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "authoritative mapfile scan was empty" in result.output
+    conn = duckdb.connect(str(database_path))
+    assert conn.execute("SELECT dataset_id FROM datasets").fetchall() == [
+        ("existing",),
+    ]
