@@ -14,3 +14,11 @@ stac-items/
 
 # Temporary files
 *.tmp
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+
+# Build artifacts
+*.egg-info/
